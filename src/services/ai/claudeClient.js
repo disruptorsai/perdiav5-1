@@ -344,51 +344,71 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
   /**
    * Revise content based on editorial feedback
+   * CRITICAL: This method MUST preserve the original article and only make targeted edits
    */
   async reviseWithFeedback(content, feedbackItems) {
+    // Calculate original word count to validate later
+    const originalWordCount = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0).length
+
     const feedbackText = feedbackItems.map((item, index) => {
-      return `${index + 1}. [${item.category.toUpperCase()}] ${item.severity}: "${item.selected_text}"
-   Issue: ${item.comment}`
+      return `${index + 1}. [${item.category.toUpperCase()}] ${item.severity}
+   Selected text: "${item.selected_text}"
+   Requested change: ${item.comment}`
     }).join('\n\n')
 
-    const prompt = `You are a content editor revising this article based on editorial feedback.
+    const prompt = `You are a SURGICAL content editor. Your task is to make ONLY the specific changes requested in the editorial feedback below.
 
-CURRENT CONTENT:
+=== CRITICAL RULES - READ CAREFULLY ===
+
+1. **PRESERVE THE ENTIRE ARTICLE**: You MUST return the COMPLETE article with ONLY the specific requested changes. Do NOT summarize, condense, rewrite, or replace the article.
+
+2. **TARGETED EDITS ONLY**: Make ONLY the exact changes described in each feedback item. If feedback says "change 2025 to 2026", change ONLY that text. If feedback says "fix typo", fix ONLY that typo.
+
+3. **WORD COUNT REQUIREMENT**: The original article is approximately ${originalWordCount} words. Your output MUST be approximately the same length (within 10%). If your output is significantly shorter, you have made a critical error.
+
+4. **DO NOT**:
+   - Summarize or condense the article
+   - Replace sections with new content unless specifically requested
+   - Remove content unless specifically requested
+   - Rewrite sentences that weren't mentioned in feedback
+   - Add new sections unless specifically requested
+
+=== CURRENT HTML CONTENT (${originalWordCount} words) ===
+
 ${content}
 
-EDITORIAL FEEDBACK:
+=== END CURRENT CONTENT ===
+
+=== EDITORIAL FEEDBACK (${feedbackItems.length} items) ===
+
 ${feedbackText}
 
-=== CRITICAL HTML FORMATTING RULES ===
+=== END FEEDBACK ===
 
-Your output MUST be properly formatted HTML with:
-1. <h2> tags for major section headings
-2. <h3> tags for subsections
-3. <p> tags wrapping EVERY paragraph of text
-4. <ul> and <li> tags for bulleted lists
-5. <ol> and <li> tags for numbered lists
-6. <strong> or <b> tags for bold text
-7. <em> or <i> tags for italic text
-8. <a href="..."> tags for any links
+=== OUTPUT REQUIREMENTS ===
 
-NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+1. Return the COMPLETE article HTML with ONLY the targeted edits made
+2. Preserve ALL HTML formatting exactly as it appears
+3. Maintain the same structure, headings, paragraphs, and sections
+4. Your output should be approximately ${originalWordCount} words (the same as input)
+5. Do NOT add explanations or commentary - output ONLY the revised HTML
 
-=== END HTML FORMATTING RULES ===
+=== HTML FORMATTING (preserve existing format) ===
 
-INSTRUCTIONS:
-1. Address each piece of feedback carefully
-2. Make necessary revisions to the content
-3. Maintain the overall structure and tone
-4. Keep all other content unchanged
-5. Preserve HTML formatting and ensure ALL new content is properly HTML formatted
+Your output MUST maintain proper HTML:
+- <h2> and <h3> tags for headings
+- <p> tags for paragraphs
+- <ul>/<ol> and <li> tags for lists
+- <a href="..."> tags for links
+- <strong>/<em> tags for formatting
 
-OUTPUT ONLY THE REVISED HTML CONTENT.`
+OUTPUT THE COMPLETE REVISED HTML NOW:`
 
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4500,
-        temperature: 0.7,
+        max_tokens: 8000,  // Increased to ensure full article can be returned
+        temperature: 0.3,  // Lower temperature for more precise, deterministic edits
         messages: [
           {
             role: 'user',
@@ -397,7 +417,23 @@ OUTPUT ONLY THE REVISED HTML CONTENT.`
         ]
       })
 
-      return response.content[0].text
+      const revisedContent = response.content[0].text
+
+      // Validate that content wasn't accidentally truncated or replaced
+      const revisedWordCount = revisedContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0).length
+
+      // If revised content is less than 50% of original, something went wrong
+      if (revisedWordCount < originalWordCount * 0.5) {
+        console.error(`[ClaudeClient] CRITICAL: Revision reduced content from ${originalWordCount} to ${revisedWordCount} words (${Math.round(revisedWordCount/originalWordCount*100)}%)`)
+        throw new Error(`AI revision failed: Content was reduced from ${originalWordCount} to ${revisedWordCount} words. This indicates the AI replaced instead of edited the content. Original content preserved.`)
+      }
+
+      // Log warning if content changed significantly
+      if (revisedWordCount < originalWordCount * 0.8 || revisedWordCount > originalWordCount * 1.2) {
+        console.warn(`[ClaudeClient] Warning: Word count changed from ${originalWordCount} to ${revisedWordCount} (${Math.round(revisedWordCount/originalWordCount*100)}%)`)
+      }
+
+      return revisedContent
 
     } catch (error) {
       console.error('Claude revision error:', error)
