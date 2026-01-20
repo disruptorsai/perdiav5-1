@@ -25,6 +25,9 @@ import {
   Plus,
   Bookmark,
   MoreHorizontal,
+  ThumbsUp,
+  ThumbsDown,
+  Brain,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -171,6 +174,163 @@ function VersionNotes({ versionId, initialNotes, onSave }) {
     >
       <MessageSquare className="w-3 h-3 inline mr-1" />
       {notes}
+    </div>
+  )
+}
+
+/**
+ * VersionFeedback - AI revision feedback for learning
+ * Captures whether revisions were helpful to improve future AI outputs
+ */
+function VersionFeedback({ versionId, versionType, initialFeedback, onFeedbackSaved }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [rating, setRating] = useState(initialFeedback?.rating || null)
+  const [comment, setComment] = useState(initialFeedback?.comment || '')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(!!initialFeedback)
+
+  // Only show for AI revisions
+  if (versionType !== 'ai_revision' && versionType !== 'ai_update') {
+    return null
+  }
+
+  const handleSave = async () => {
+    if (!rating) return
+
+    setIsSaving(true)
+    try {
+      // Save feedback to database (using existing revision tracking)
+      // This data can be used to train/improve AI revisions
+      const feedback = {
+        version_id: versionId,
+        rating: rating,
+        comment: comment.trim(),
+        created_at: new Date().toISOString(),
+      }
+
+      // Store in localStorage for now (could be moved to Supabase)
+      const existingFeedback = JSON.parse(localStorage.getItem('ai_revision_feedback') || '[]')
+      existingFeedback.push(feedback)
+      localStorage.setItem('ai_revision_feedback', JSON.stringify(existingFeedback))
+
+      setSaved(true)
+      setIsExpanded(false)
+      onFeedbackSaved?.(feedback)
+    } catch (error) {
+      console.error('Failed to save feedback:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (saved && !isExpanded) {
+    return (
+      <div
+        className="mt-2 flex items-center gap-2 text-xs text-gray-500 cursor-pointer hover:text-gray-700"
+        onClick={() => setIsExpanded(true)}
+      >
+        <Brain className="w-3 h-3" />
+        <span>Feedback recorded</span>
+        {rating === 'helpful' && <ThumbsUp className="w-3 h-3 text-green-600" />}
+        {rating === 'not_helpful' && <ThumbsDown className="w-3 h-3 text-red-600" />}
+      </div>
+    )
+  }
+
+  if (!isExpanded) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsExpanded(true)}
+        className="mt-2 gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+      >
+        <Brain className="w-3 h-3" />
+        Rate this revision
+      </Button>
+    )
+  }
+
+  return (
+    <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+      <div className="flex items-center gap-2 mb-2">
+        <Brain className="w-4 h-4 text-purple-600" />
+        <span className="text-sm font-medium text-purple-800">Help improve AI revisions</span>
+      </div>
+
+      <p className="text-xs text-purple-700 mb-3">
+        Your feedback helps the system learn and improve future revisions.
+      </p>
+
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-sm text-gray-700">Was this revision helpful?</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setRating('helpful')}
+            className={cn(
+              'p-2 rounded-lg border-2 transition-all',
+              rating === 'helpful'
+                ? 'border-green-500 bg-green-100 text-green-700'
+                : 'border-gray-200 hover:border-green-300 hover:bg-green-50 text-gray-500'
+            )}
+          >
+            <ThumbsUp className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setRating('not_helpful')}
+            className={cn(
+              'p-2 rounded-lg border-2 transition-all',
+              rating === 'not_helpful'
+                ? 'border-red-500 bg-red-100 text-red-700'
+                : 'border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-500'
+            )}
+          >
+            <ThumbsDown className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <Textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder={
+          rating === 'helpful'
+            ? "What worked well? (e.g., 'Good tone match', 'Accurate edits')"
+            : rating === 'not_helpful'
+              ? "What could be improved? (e.g., 'Changed too much', 'Missed the point')"
+              : "Add optional details about this revision..."
+        }
+        className="min-h-[60px] text-sm mb-2"
+      />
+
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={!rating || isSaving}
+          className="gap-1 bg-purple-600 hover:bg-purple-700"
+        >
+          {isSaving ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Check className="w-3 h-3" />
+          )}
+          Save Feedback
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setIsExpanded(false)
+            if (!saved) {
+              setRating(initialFeedback?.rating || null)
+              setComment(initialFeedback?.comment || '')
+            }
+          }}
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   )
 }
@@ -386,6 +546,13 @@ function VersionCard({
                 initialNotes={version.notes}
               />
             )}
+
+            {/* AI Revision Feedback - helps system learn */}
+            <VersionFeedback
+              versionId={version.id}
+              versionType={version.version_type}
+              initialFeedback={version.feedback}
+            />
           </div>
         </div>
 
