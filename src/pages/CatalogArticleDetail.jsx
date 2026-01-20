@@ -35,6 +35,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
+import QualityChecklist from '@/components/editor/QualityChecklist'
 
 // Icons
 import {
@@ -491,13 +492,16 @@ export default function CatalogArticleDetail() {
 
           {/* Versions Tab */}
           <TabsContent value="versions">
-            <Card className="border-none shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Version History</CardTitle>
-                <CardDescription>
-                  Track all changes made to this article over time
-                </CardDescription>
-              </CardHeader>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Version History - Main Panel */}
+              <div className="lg:col-span-2">
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Version History</CardTitle>
+                    <CardDescription>
+                      Track all changes made to this article over time
+                    </CardDescription>
+                  </CardHeader>
               <CardContent>
                 {versionsLoading ? (
                   <div className="space-y-3">
@@ -616,7 +620,24 @@ export default function CatalogArticleDetail() {
                   </div>
                 )}
               </CardContent>
-            </Card>
+                </Card>
+              </div>
+
+              {/* SEO Quality Panel - Sidebar */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-4 space-y-4">
+                  <QualityChecklist
+                    article={{
+                      ...article,
+                      content_html: article.content_html,
+                      quality_score: article.quality_score || 0,
+                      quality_issues: article.quality_issues || [],
+                    }}
+                    onAutoFix={() => setIsRevisionDialogOpen(true)}
+                  />
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Analysis Tab */}
