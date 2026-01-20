@@ -14,7 +14,6 @@ import {
   StarOff,
   Tag,
   MessageSquare,
-  MessageSquarePlus,
   RotateCcw,
   Send,
   GitCompare,
@@ -26,8 +25,6 @@ import {
   Plus,
   Bookmark,
   MoreHorizontal,
-  AlertCircle,
-  Lightbulb,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -65,22 +62,21 @@ import { cn } from '@/lib/utils'
 
 /**
  * Get version type icon and configuration
- * NOTE: Uses explicit Tailwind classes (not dynamic) for build-time compatibility
  */
 function getVersionTypeConfig(versionType) {
   switch (versionType) {
     case 'original':
-      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', textColor: 'text-gray-600', label: 'Original' }
+      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', label: 'Original' }
     case 'ai_revision':
-      return { icon: Zap, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', label: 'AI Revision' }
+      return { icon: Zap, color: 'purple', bgColor: 'bg-purple-100', label: 'AI Revision' }
     case 'manual_edit':
-      return { icon: Edit3, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', label: 'Manual Edit' }
+      return { icon: Edit3, color: 'blue', bgColor: 'bg-blue-100', label: 'Manual Edit' }
     case 'ai_update':
-      return { icon: Zap, color: 'green', bgColor: 'bg-green-100', textColor: 'text-green-600', label: 'AI Update' }
+      return { icon: Zap, color: 'green', bgColor: 'bg-green-100', label: 'AI Update' }
     case 'republished':
-      return { icon: Radio, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', label: 'Republished' }
+      return { icon: Radio, color: 'cyan', bgColor: 'bg-cyan-100', label: 'Republished' }
     default:
-      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', textColor: 'text-gray-600', label: versionType }
+      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', label: versionType }
   }
 }
 
@@ -102,8 +98,7 @@ function getTagColorClasses(color) {
 }
 
 /**
- * Simple VersionNotes - Notes/comments section for versions
- * Simplified implementation to avoid hoisting issues
+ * VersionNotes - Inline notes editor
  */
 function VersionNotes({ versionId, initialNotes, onSave }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -111,21 +106,32 @@ function VersionNotes({ versionId, initialNotes, onSave }) {
   const updateNotes = useUpdateVersionNotes()
 
   const handleSave = async () => {
-    await updateNotes.mutateAsync({
-      versionId,
-      notes: notes.trim()
-    })
+    await updateNotes.mutateAsync({ versionId, notes })
     setIsEditing(false)
-    onSave?.(notes.trim())
+    onSave?.(notes)
+  }
+
+  if (!isEditing && !notes) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsEditing(true)}
+        className="gap-1 text-gray-500 hover:text-gray-700"
+      >
+        <MessageSquare className="w-3 h-3" />
+        Add note
+      </Button>
+    )
   }
 
   if (isEditing) {
     return (
-      <div className="mt-3 space-y-2">
+      <div className="space-y-2 mt-2">
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add notes or feedback about this version..."
+          placeholder="Add notes about this version..."
           className="min-h-[80px] text-sm"
           autoFocus
         />
@@ -158,32 +164,13 @@ function VersionNotes({ versionId, initialNotes, onSave }) {
     )
   }
 
-  if (initialNotes) {
-    return (
-      <div className="mt-3">
-        <div
-          className="p-2 bg-blue-50 border border-blue-200 rounded-md text-sm flex items-start gap-2 group cursor-pointer hover:bg-blue-100"
-          onClick={() => setIsEditing(true)}
-        >
-          <MessageSquare className="w-4 h-4 mt-0.5 text-blue-600 flex-shrink-0" />
-          <p className="text-blue-800 flex-1">{initialNotes}</p>
-          <Edit3 className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="mt-3">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsEditing(true)}
-        className="gap-1 w-full justify-center bg-white hover:bg-blue-50 border-dashed"
-      >
-        <MessageSquarePlus className="w-4 h-4 text-blue-600" />
-        <span className="text-blue-600">Add Feedback</span>
-      </Button>
+    <div
+      className="mt-2 p-2 bg-blue-50 rounded-md text-sm text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
+      <MessageSquare className="w-3 h-3 inline mr-1" />
+      {notes}
     </div>
   )
 }
@@ -243,32 +230,20 @@ function VersionTags({ versionId, tags = [], onTagAdd, onTagRemove }) {
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2" align="start">
             <div className="space-y-1">
-              {availableTags.map(tag => {
-                const dotColorClasses = {
-                  green: 'bg-green-500',
-                  yellow: 'bg-yellow-500',
-                  red: 'bg-red-500',
-                  blue: 'bg-blue-500',
-                  purple: 'bg-purple-500',
-                  gray: 'bg-gray-500',
-                  cyan: 'bg-cyan-500',
-                  orange: 'bg-orange-500',
-                }
-                return (
-                  <button
-                    key={tag.value}
-                    onClick={() => handleAddTag(tag.value)}
-                    className={cn(
-                      'w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-100 flex items-center gap-2',
-                      addTag.isPending && 'opacity-50'
-                    )}
-                    disabled={addTag.isPending}
-                  >
-                    <span className={cn('w-2 h-2 rounded-full', dotColorClasses[tag.color] || 'bg-gray-500')} />
-                    {tag.label}
-                  </button>
-                )
-              })}
+              {availableTags.map(tag => (
+                <button
+                  key={tag.value}
+                  onClick={() => handleAddTag(tag.value)}
+                  className={cn(
+                    'w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-100 flex items-center gap-2',
+                    addTag.isPending && 'opacity-50'
+                  )}
+                  disabled={addTag.isPending}
+                >
+                  <span className={cn('w-2 h-2 rounded-full', `bg-${tag.color}-500`)} />
+                  {tag.label}
+                </button>
+              ))}
             </div>
           </PopoverContent>
         </Popover>
@@ -343,7 +318,7 @@ function VersionCard({
 
           {/* Version Icon */}
           <div className={cn('p-2 rounded-lg', config.bgColor)}>
-            <Icon className={cn('w-4 h-4', config.textColor)} />
+            <Icon className={cn('w-4 h-4', `text-${config.color}-600`)} />
           </div>
 
           {/* Version Info */}
@@ -404,20 +379,12 @@ function VersionCard({
               tags={version.tags || []}
             />
 
-            {/* Version Notes - Always show when expanded or has notes */}
-            {(isExpanded || version.notes) && (
+            {/* Version Notes */}
+            {(version.notes || isExpanded) && (
               <VersionNotes
                 versionId={version.id}
                 initialNotes={version.notes}
               />
-            )}
-
-            {/* Show notes indicator if collapsed but has notes */}
-            {!isExpanded && version.notes && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-blue-600">
-                <MessageSquare className="w-3 h-3" />
-                Has notes
-              </div>
             )}
           </div>
         </div>
