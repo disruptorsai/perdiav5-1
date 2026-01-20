@@ -237,23 +237,25 @@ class SurgicalRevisionService {
     // Extract just the relevant section to minimize context
     const contextWindow = this.extractRelevantContext(content, selectedText)
 
-    const prompt = `You are making a single, specific edit to article content.
+    const prompt = `You are making a single, precise edit to article content.
 
-SELECTED TEXT:
+SELECTED TEXT TO MODIFY:
 "${selectedText}"
 
-REQUESTED CHANGE:
+EDITORIAL FEEDBACK:
 ${feedback}
 
 SURROUNDING CONTEXT:
 ${contextWindow.context}
 
 TASK:
-Return ONLY the corrected version of the surrounding context with the requested change applied.
-- Make the minimal change needed to address the feedback
-- Keep everything else EXACTLY the same
-- Return raw HTML, no markdown, no explanations
-- Do NOT rewrite or improve other parts of the text
+Replace or modify the SELECTED TEXT based on the editorial feedback.
+- Find "${selectedText}" in the context and apply the requested change
+- If feedback says to change/replace something, do exactly that replacement
+- If feedback suggests a correction, make that specific correction
+- Keep everything else in the context EXACTLY the same
+- Return the complete surrounding context with ONLY the targeted change applied
+- Return raw HTML only, no markdown code blocks, no explanations
 
 OUTPUT:`
 
@@ -297,22 +299,25 @@ OUTPUT:`
    * Still uses minimal prompt but with full article
    */
   async performFullAIRevision(content, selectedText, feedback) {
-    const prompt = `Make ONE specific change to this HTML content.
+    const prompt = `Make ONE precise edit to this HTML content.
 
-FIND THIS TEXT:
+SELECTED TEXT TO MODIFY:
 "${selectedText}"
 
-MAKE THIS CHANGE:
+EDITORIAL FEEDBACK:
 ${feedback}
 
-CONTENT:
+FULL CONTENT:
 ${content}
 
 RULES:
-1. Make ONLY the requested change
-2. Keep ALL other content exactly the same
-3. Preserve all HTML tags and structure
-4. Return the complete HTML with the single change applied
+1. Find the SELECTED TEXT in the content
+2. Apply the editorial feedback to modify/replace that specific text
+3. If feedback says "change X to Y" or "should be Y", replace X with Y
+4. Keep ALL other content exactly the same - do not rewrite anything else
+5. Preserve all HTML tags and structure exactly
+6. Return the COMPLETE HTML with only the single targeted change
+7. Do NOT summarize or shorten the content
 
 OUTPUT:`
 

@@ -626,7 +626,7 @@ function ArticleEditorContent() {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === article.status)
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-[calc(100vh-64px)] flex flex-col bg-gray-50">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
