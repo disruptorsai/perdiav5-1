@@ -603,28 +603,50 @@ export default function CatalogArticleDetail() {
               {article.title}
             </h1>
             <div className="flex items-center gap-3 mt-2">
-              <a
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-              >
-                {article.url}
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              {article.url ? (
+                <a
+                  href={article.url.startsWith('http') ? article.url : `https://${article.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                >
+                  {article.url}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-gray-400 text-sm flex items-center gap-1">
+                  No live URL available
+                </span>
+              )}
             </div>
           </div>
 
           <div className="flex gap-2">
             {/* Prominent View Live Button */}
-            <Button
-              variant="default"
-              className="gap-2 bg-green-600 hover:bg-green-700"
-              onClick={() => window.open(article.url, '_blank')}
-            >
-              <ExternalLink className="w-4 h-4" />
-              View Live
-            </Button>
+            {article.url ? (
+              <Button
+                variant="default"
+                className="gap-2 bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  // Ensure URL has protocol
+                  const url = article.url.startsWith('http') ? article.url : `https://${article.url}`
+                  window.open(url, '_blank')
+                }}
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Live
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="gap-2 cursor-not-allowed opacity-60"
+                disabled
+                title="No live URL available for this article"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Live
+              </Button>
+            )}
 
             <Button
               variant="outline"
@@ -1113,29 +1135,83 @@ export default function CatalogArticleDetail() {
 
           {/* Versions Tab - With Enhanced Version History Panel */}
           <TabsContent value="versions">
-            <Card className="border-none shadow-sm">
-              <CardHeader className="flex flex-row items-start justify-between">
-                <div>
-                  <CardTitle className="text-lg">Version History</CardTitle>
-                  <CardDescription>
-                    Select a version to preview it in the Content tab. Star important versions and add notes for reference.
-                  </CardDescription>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Version History - Main Panel */}
+              <div className="lg:col-span-2">
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Version History</CardTitle>
+                      <CardDescription>
+                        Select a version to preview it in the Content tab. Star important versions and add notes for reference.
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <VersionHistoryPanel
+                      articleId={articleId}
+                      versions={versions}
+                      currentVersionId={article?.current_version_id}
+                      selectedVersionId={article?.selected_version_id}
+                      isLoading={versionsLoading}
+                      onSelectVersion={handleSelectVersion}
+                      onRestoreVersion={handleRestoreVersion}
+                      onPublish={() => setIsPublishDialogOpen(true)}
+                      isRestoring={restoreVersionMutation.isPending}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* SEO Quality Panel - Sidebar */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-4 space-y-4">
+                  {/* Quality Checklist */}
+                  <QualityChecklist
+                    article={{
+                      ...article,
+                      content: displayContent.html,
+                      content_html: displayContent.html,
+                      quality_score: article.quality_score || analysis?.qualityScore || 0,
+                      quality_issues: article.quality_issues || analysis?.qualityIssues || [],
+                    }}
+                    onAutoFix={() => {
+                      setRevisionType('quality')
+                      setIsRevisionDialogOpen(true)
+                    }}
+                  />
+
+                  {/* Quick Stats for Selected Version */}
+                  <Card className="border-none shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-700">
+                        {displayContent.source === 'selected' ? 'Selected Version Stats' : 'Current Version Stats'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Version</span>
+                        <span className="font-medium">
+                          {displayContent.versionNumber ? `v${displayContent.versionNumber}` : 'Current'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Word Count</span>
+                        <span className="font-medium">{displayContent.wordCount?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Internal Links</span>
+                        <span className="font-medium">{article.internal_links?.length || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">External Links</span>
+                        <span className="font-medium">{article.external_links?.length || 0}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <VersionHistoryPanel
-                  articleId={articleId}
-                  versions={versions}
-                  currentVersionId={article?.current_version_id}
-                  selectedVersionId={article?.selected_version_id}
-                  isLoading={versionsLoading}
-                  onSelectVersion={handleSelectVersion}
-                  onRestoreVersion={handleRestoreVersion}
-                  onPublish={() => setIsPublishDialogOpen(true)}
-                  isRestoring={restoreVersionMutation.isPending}
-                />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Analysis Tab */}

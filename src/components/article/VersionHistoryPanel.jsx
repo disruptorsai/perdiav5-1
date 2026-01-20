@@ -14,6 +14,7 @@ import {
   StarOff,
   Tag,
   MessageSquare,
+  MessageSquarePlus,
   RotateCcw,
   Send,
   GitCompare,
@@ -25,6 +26,8 @@ import {
   Plus,
   Bookmark,
   MoreHorizontal,
+  AlertCircle,
+  Lightbulb,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -98,82 +101,171 @@ function getTagColorClasses(color) {
 }
 
 /**
- * VersionNotes - Inline notes editor
+ * VersionFeedback - Enhanced feedback/comments section for versions
+ * Supports multiple feedback items stored as JSON in notes field
  */
-function VersionNotes({ versionId, initialNotes, onSave }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [notes, setNotes] = useState(initialNotes || '')
+function VersionFeedback({ versionId, initialNotes, onSave }) {
+  const [isAdding, setIsAdding] = useState(false)
+  const [newFeedback, setNewFeedback] = useState('')
+  const [feedbackType, setFeedbackType] = useState('note') // note, issue, suggestion
   const updateNotes = useUpdateVersionNotes()
 
-  const handleSave = async () => {
-    await updateNotes.mutateAsync({ versionId, notes })
-    setIsEditing(false)
-    onSave?.(notes)
+  // Parse notes as JSON array or convert single string to array
+  const feedbackItems = useMemo(() => {
+    if (!initialNotes) return []
+    try {
+      const parsed = JSON.parse(initialNotes)
+      return Array.isArray(parsed) ? parsed : [{ text: initialNotes, type: 'note', date: null }]
+    } catch {
+      return initialNotes ? [{ text: initialNotes, type: 'note', date: null }] : []
+    }
+  }, [initialNotes])
+
+  const handleAddFeedback = async () => {
+    if (!newFeedback.trim()) return
+
+    const newItem = {
+      id: Date.now(),
+      text: newFeedback.trim(),
+      type: feedbackType,
+      date: new Date().toISOString(),
+    }
+
+    const updatedItems = [...feedbackItems, newItem]
+
+    await updateNotes.mutateAsync({
+      versionId,
+      notes: JSON.stringify(updatedItems)
+    })
+
+    setNewFeedback('')
+    setFeedbackType('note')
+    setIsAdding(false)
+    onSave?.(JSON.stringify(updatedItems))
   }
 
-  if (!isEditing && !notes) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsEditing(true)}
-        className="gap-1 text-gray-500 hover:text-gray-700"
-      >
-        <MessageSquare className="w-3 h-3" />
-        Add note
-      </Button>
-    )
+  const handleDeleteFeedback = async (itemId) => {
+    const updatedItems = feedbackItems.filter(item => item.id !== itemId)
+    await updateNotes.mutateAsync({
+      versionId,
+      notes: updatedItems.length > 0 ? JSON.stringify(updatedItems) : ''
+    })
+    onSave?.(updatedItems.length > 0 ? JSON.stringify(updatedItems) : '')
   }
 
-  if (isEditing) {
-    return (
-      <div className="space-y-2 mt-2">
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add notes about this version..."
-          className="min-h-[80px] text-sm"
-          autoFocus
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={updateNotes.isPending}
-            className="gap-1"
-          >
-            {updateNotes.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Check className="w-3 h-3" />
-            )}
-            Save
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setNotes(initialNotes || '')
-              setIsEditing(false)
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    )
+  const typeConfig = {
+    note: { icon: MessageSquare, color: 'blue', label: 'Note' },
+    issue: { icon: AlertCircle, color: 'red', label: 'Issue' },
+    suggestion: { icon: Lightbulb, color: 'amber', label: 'Suggestion' },
   }
 
   return (
-    <div
-      className="mt-2 p-2 bg-blue-50 rounded-md text-sm text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors"
-      onClick={() => setIsEditing(true)}
-    >
-      <MessageSquare className="w-3 h-3 inline mr-1" />
-      {notes}
+    <div className="mt-3 space-y-2">
+      {/* Existing feedback items */}
+      {feedbackItems.length > 0 && (
+        <div className="space-y-2">
+          {feedbackItems.map((item, idx) => {
+            const config = typeConfig[item.type] || typeConfig.note
+            const IconComponent = config.icon
+            return (
+              <div
+                key={item.id || idx}
+                className={cn(
+                  'p-2 rounded-md text-sm flex items-start gap-2 group',
+                  `bg-${config.color}-50 border border-${config.color}-200`
+                )}
+              >
+                <IconComponent className={cn('w-4 h-4 mt-0.5 flex-shrink-0', `text-${config.color}-600`)} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-sm', `text-${config.color}-800`)}>{item.text}</p>
+                  {item.date && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {format(new Date(item.date), 'MMM d, h:mm a')}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteFeedback(item.id)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Add feedback form */}
+      {isAdding ? (
+        <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex gap-2">
+            {Object.entries(typeConfig).map(([type, config]) => (
+              <button
+                key={type}
+                onClick={() => setFeedbackType(type)}
+                className={cn(
+                  'px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1',
+                  feedbackType === type
+                    ? `bg-${config.color}-100 text-${config.color}-700 border border-${config.color}-300`
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                )}
+              >
+                <config.icon className="w-3 h-3" />
+                {config.label}
+              </button>
+            ))}
+          </div>
+          <Textarea
+            value={newFeedback}
+            onChange={(e) => setNewFeedback(e.target.value)}
+            placeholder="Add your feedback about this version..."
+            className="min-h-[60px] text-sm"
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleAddFeedback}
+              disabled={updateNotes.isPending || !newFeedback.trim()}
+              className="gap-1"
+            >
+              {updateNotes.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Plus className="w-3 h-3" />
+              )}
+              Add Feedback
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setNewFeedback('')
+                setIsAdding(false)
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsAdding(true)}
+          className="gap-1 w-full justify-center bg-white hover:bg-blue-50 border-dashed"
+        >
+          <MessageSquarePlus className="w-4 h-4 text-blue-600" />
+          <span className="text-blue-600">Add Feedback on This Version</span>
+        </Button>
+      )}
     </div>
   )
 }
+
+// Backwards compatible alias
+const VersionNotes = VersionFeedback
 
 /**
  * VersionTags - Tag management for a version
@@ -379,13 +471,29 @@ function VersionCard({
               tags={version.tags || []}
             />
 
-            {/* Version Notes */}
-            {(version.notes || isExpanded) && (
-              <VersionNotes
+            {/* Version Feedback - Always show when expanded or has notes */}
+            {(isExpanded || version.notes) && (
+              <VersionFeedback
                 versionId={version.id}
                 initialNotes={version.notes}
               />
             )}
+
+            {/* Show feedback count indicator if collapsed but has notes */}
+            {!isExpanded && version.notes && (() => {
+              try {
+                const items = JSON.parse(version.notes)
+                const count = Array.isArray(items) ? items.length : 1
+                return (
+                  <div className="mt-2 flex items-center gap-1 text-xs text-blue-600">
+                    <MessageSquare className="w-3 h-3" />
+                    {count} feedback item{count !== 1 ? 's' : ''}
+                  </div>
+                )
+              } catch {
+                return null
+              }
+            })()}
           </div>
         </div>
 
