@@ -65,21 +65,22 @@ import { cn } from '@/lib/utils'
 
 /**
  * Get version type icon and configuration
+ * NOTE: Uses explicit Tailwind classes (not dynamic) for build-time compatibility
  */
 function getVersionTypeConfig(versionType) {
   switch (versionType) {
     case 'original':
-      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', label: 'Original' }
+      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', textColor: 'text-gray-600', label: 'Original' }
     case 'ai_revision':
-      return { icon: Zap, color: 'purple', bgColor: 'bg-purple-100', label: 'AI Revision' }
+      return { icon: Zap, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', label: 'AI Revision' }
     case 'manual_edit':
-      return { icon: Edit3, color: 'blue', bgColor: 'bg-blue-100', label: 'Manual Edit' }
+      return { icon: Edit3, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', label: 'Manual Edit' }
     case 'ai_update':
-      return { icon: Zap, color: 'green', bgColor: 'bg-green-100', label: 'AI Update' }
+      return { icon: Zap, color: 'green', bgColor: 'bg-green-100', textColor: 'text-green-600', label: 'AI Update' }
     case 'republished':
-      return { icon: Radio, color: 'cyan', bgColor: 'bg-cyan-100', label: 'Republished' }
+      return { icon: Radio, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', label: 'Republished' }
     default:
-      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', label: versionType }
+      return { icon: FileText, color: 'gray', bgColor: 'bg-gray-100', textColor: 'text-gray-600', label: versionType }
   }
 }
 
@@ -222,21 +223,24 @@ function VersionFeedback({ versionId, initialNotes, onSave }) {
       {isAdding ? (
         <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
           <div className="flex gap-2">
-            {Object.entries(typeConfig).map(([type, config]) => (
-              <button
-                key={type}
-                onClick={() => setFeedbackType(type)}
-                className={cn(
-                  'px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1',
-                  feedbackType === type
-                    ? config.activeClass
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-                )}
-              >
-                <config.icon className="w-3 h-3" />
-                {config.label}
-              </button>
-            ))}
+            {Object.entries(typeConfig).map(([type, config]) => {
+              const TypeIcon = config.icon
+              return (
+                <button
+                  key={type}
+                  onClick={() => setFeedbackType(type)}
+                  className={cn(
+                    'px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1',
+                    feedbackType === type
+                      ? config.activeClass
+                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  )}
+                >
+                  <TypeIcon className="w-3 h-3" />
+                  {config.label}
+                </button>
+              )
+            })}
           </div>
           <Textarea
             value={newFeedback}
@@ -344,20 +348,32 @@ function VersionTags({ versionId, tags = [], onTagAdd, onTagRemove }) {
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2" align="start">
             <div className="space-y-1">
-              {availableTags.map(tag => (
-                <button
-                  key={tag.value}
-                  onClick={() => handleAddTag(tag.value)}
-                  className={cn(
-                    'w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-100 flex items-center gap-2',
-                    addTag.isPending && 'opacity-50'
-                  )}
-                  disabled={addTag.isPending}
-                >
-                  <span className={cn('w-2 h-2 rounded-full', `bg-${tag.color}-500`)} />
-                  {tag.label}
-                </button>
-              ))}
+              {availableTags.map(tag => {
+                const dotColorClasses = {
+                  green: 'bg-green-500',
+                  yellow: 'bg-yellow-500',
+                  red: 'bg-red-500',
+                  blue: 'bg-blue-500',
+                  purple: 'bg-purple-500',
+                  gray: 'bg-gray-500',
+                  cyan: 'bg-cyan-500',
+                  orange: 'bg-orange-500',
+                }
+                return (
+                  <button
+                    key={tag.value}
+                    onClick={() => handleAddTag(tag.value)}
+                    className={cn(
+                      'w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-100 flex items-center gap-2',
+                      addTag.isPending && 'opacity-50'
+                    )}
+                    disabled={addTag.isPending}
+                  >
+                    <span className={cn('w-2 h-2 rounded-full', dotColorClasses[tag.color] || 'bg-gray-500')} />
+                    {tag.label}
+                  </button>
+                )
+              })}
             </div>
           </PopoverContent>
         </Popover>
@@ -432,7 +448,7 @@ function VersionCard({
 
           {/* Version Icon */}
           <div className={cn('p-2 rounded-lg', config.bgColor)}>
-            <Icon className={cn('w-4 h-4', `text-${config.color}-600`)} />
+            <Icon className={cn('w-4 h-4', config.textColor)} />
           </div>
 
           {/* Version Info */}
