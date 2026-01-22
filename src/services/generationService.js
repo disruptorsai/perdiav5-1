@@ -24,6 +24,7 @@ import {
 import { contentValidator, validateDraft, validateForPublish } from './validation/contentValidator'
 import { calculateQualityScore, getQualityThresholds, calculateQualityScoreAsync } from './qualityScoreService'
 import surgicalRevisionService from './surgicalRevisionService'
+import { validateContent, BLOCKED_COMPETITORS, ALLOWED_EXTERNAL_DOMAINS } from './validation/linkValidator'
 
 class GenerationService {
   constructor() {
@@ -472,6 +473,9 @@ class GenerationService {
         throw new Error('Draft generation step is disabled in pipeline configuration')
       }
 
+      // Extract user-specified context (schools, programs) from the idea
+      const userSpecifiedContext = this.extractUserSpecifiedContext(idea)
+
       // STAGE 2: Generate draft with Grok (includes cost data, author profile, AND content rules)
       const draftData = await this.grok.generateDraft(idea, {
         contentType,
@@ -479,7 +483,8 @@ class GenerationService {
         costDataContext: costContext.promptText, // Pass cost data to prompt
         authorProfile: authorPrompt, // Pass comprehensive author profile
         authorName: contributor?.name,
-        contentRulesContext: contentRulesPrompt, // NEW: Pass content rules to AI
+        contentRulesContext: contentRulesPrompt, // Pass content rules to AI
+        userSpecifiedContext, // Pass user-specified schools/programs from idea
       })
 
       // CRITICAL: Ensure HTML formatting is proper after draft generation
@@ -510,6 +515,7 @@ class GenerationService {
           costDataContext: costContext.promptText,
           authorProfile: authorPrompt,
           authorName: contributor?.name,
+          userSpecifiedContext, // Include user-specified schools/programs
         })
 
         // Re-validate
@@ -629,6 +635,31 @@ class GenerationService {
         const siteArticles = await this.getRelevantSiteArticles(draftData.title, 30)
         if (siteArticles.length >= 3) {
           finalContent = await this.addInternalLinksToContent(humanizedContent, siteArticles)
+
+          // POST-GENERATION LINK VALIDATION
+          // Catch any blocked links that AI may have added despite instructions
+          const linkValidation = validateContent(finalContent)
+          if (!linkValidation.isCompliant) {
+            console.warn('[Generation] AI added blocked links - removing them:', linkValidation.blockingIssues)
+            // Remove the blocked links from content
+            for (const issue of linkValidation.blockingIssues) {
+              const linkRegex = new RegExp(`<a[^>]*href=["']${issue.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>[^<]*</a>`, 'gi')
+              finalContent = finalContent.replace(linkRegex, issue.anchorText || '')
+            }
+            this.logReasoning('link_validation', {
+              action: 'removed_blocked_links',
+              removed: linkValidation.blockingIssues.map(i => i.url),
+              reason: 'AI inserted blocked competitor or .edu links despite instructions',
+            })
+          }
+          if (linkValidation.warnings.length > 0) {
+            console.warn('[Generation] Link warnings:', linkValidation.warnings)
+            this.logReasoning('link_validation', {
+              action: 'warnings',
+              warnings: linkValidation.warnings.map(w => ({ url: w.url, issue: w.issues.join(', ') })),
+            })
+          }
+
           internalLinksAdded = Math.min(5, siteArticles.length) // Estimate based on our target
           selectedSiteArticles = siteArticles.slice(0, 5)
         }
@@ -1519,6 +1550,20 @@ ${content}
 AVAILABLE ARTICLES TO LINK TO:
 ${siteArticles.map(a => `- [${a.title}](${a.url})`).join('\n')}
 
+=== CRITICAL LINKING RULES ===
+
+ONLY USE URLs FROM THE "AVAILABLE ARTICLES" LIST ABOVE.
+DO NOT add ANY external links. This task is ONLY for internal GetEducated links.
+DO NOT invent, guess, or hallucinate URLs - use ONLY the exact URLs provided.
+
+NEVER link to these competitor domains (STRICTLY FORBIDDEN):
+- onlineu.com, usnews.com, bestcolleges.com, niche.com
+- affordablecollegesonline.com, petersons.com, princetonreview.com
+- collegeconfidential.com, cappex.com, collegeraptor.com
+- collegesimply.com, graduateguide.com, gradschools.com, collegexpress.com
+
+NEVER link to .edu domains directly. Use GetEducated school pages instead.
+
 === CRITICAL HTML FORMATTING RULES ===
 
 Your output MUST be properly formatted HTML with:
@@ -1535,12 +1580,13 @@ NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p
 === END HTML FORMATTING RULES ===
 
 INSTRUCTIONS:
-1. Add links where genuinely relevant
-2. Use natural anchor text
+1. Add links ONLY where genuinely relevant to the surrounding text
+2. Use natural anchor text (1-5 words from existing text)
 3. Distribute throughout article
 4. Use HTML format: <a href="URL">anchor text</a>
 5. Aim for 3-5 links total
 6. Preserve all existing HTML formatting
+7. VERIFY each URL exists in the AVAILABLE ARTICLES list before using it
 
 OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
 
@@ -1661,6 +1707,80 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .substring(0, 60)
+  }
+
+  /**
+   * Extract user-specified context from idea (schools, programs, institutions)
+   * This identifies schools/programs mentioned in the idea that should be featured in the article
+   * @param {Object} idea - The content idea
+   * @returns {string|null} - Context string to pass to AI, or null if no specific entities found
+   */
+  extractUserSpecifiedContext(idea) {
+    const contexts = []
+
+    // Common university/school name patterns
+    const schoolPatterns = [
+      /\b(university\s+of\s+\w+(?:\s+at\s+\w+)?)/gi,        // University of X, University of X at Y
+      /\b(\w+\s+university)/gi,                               // X University
+      /\b(\w+\s+state\s+university)/gi,                       // X State University
+      /\b(\w+\s+college)/gi,                                   // X College
+      /\b(ASU|UCLA|USC|MIT|NYU|SNHU|WGU|UoPX|CSU|CUNY)/g,     // Common abbreviations
+      /\b(Arizona State|Penn State|Ohio State|Florida State)/gi, // Common state schools
+      /\b(Grand Canyon University|Liberty University|Southern New Hampshire)/gi, // Online-focused
+      /\b(Purdue Global|SNHU Online|WGU|Capella|Strayer|DeVry)/gi, // Online programs
+    ]
+
+    // Extract from title
+    if (idea.title) {
+      for (const pattern of schoolPatterns) {
+        const matches = idea.title.match(pattern)
+        if (matches) {
+          contexts.push(...matches)
+        }
+      }
+    }
+
+    // Extract from description
+    if (idea.description) {
+      for (const pattern of schoolPatterns) {
+        const matches = idea.description.match(pattern)
+        if (matches) {
+          contexts.push(...matches)
+        }
+      }
+    }
+
+    // Extract from seed_topics if they look like school names
+    if (idea.seed_topics && Array.isArray(idea.seed_topics)) {
+      for (const topic of idea.seed_topics) {
+        if (/university|college|state|online|program/i.test(topic)) {
+          contexts.push(topic)
+        }
+      }
+    }
+
+    // Deduplicate and format
+    const uniqueContexts = [...new Set(contexts.map(c => c.trim()))]
+      .filter(c => c.length > 2) // Filter out very short matches
+
+    if (uniqueContexts.length === 0) {
+      return null
+    }
+
+    // Build context string
+    let contextString = `Schools/Programs mentioned by user:\n`
+    for (const context of uniqueContexts) {
+      contextString += `- ${context}\n`
+    }
+
+    // Also include full title and description for context
+    contextString += `\nOriginal idea title: "${idea.title}"\n`
+    if (idea.description) {
+      contextString += `Original idea description: "${idea.description}"\n`
+    }
+
+    console.log('[Generation] Extracted user-specified context:', uniqueContexts)
+    return contextString
   }
 
   /**
@@ -2459,6 +2579,21 @@ ${content}
 AVAILABLE ARTICLES TO LINK TO (pick ${linksToAdd} most relevant):
 ${siteArticles.slice(0, 10).map(a => `- [${a.title}](${a.url})`).join('\n')}
 
+=== CRITICAL LINKING RULES ===
+
+ONLY USE URLs FROM THE "AVAILABLE ARTICLES" LIST ABOVE.
+DO NOT add ANY external links. This task is ONLY for internal GetEducated links.
+DO NOT invent, guess, or hallucinate URLs - use ONLY the exact URLs provided.
+
+NEVER link to these competitor domains (STRICTLY FORBIDDEN):
+- onlineu.com, usnews.com, bestcolleges.com, niche.com
+- affordablecollegesonline.com, petersons.com, princetonreview.com
+- collegeconfidential.com, cappex.com, collegeraptor.com
+
+NEVER link to .edu domains directly.
+
+=== END CRITICAL LINKING RULES ===
+
 RULES:
 1. Add EXACTLY ${linksToAdd} links, no more, no fewer
 2. Use natural anchor text (1-5 words from existing text)
@@ -2466,6 +2601,7 @@ RULES:
 4. Use HTML format: <a href="URL">existing text</a>
 5. Choose link placements that make sense contextually
 6. Distribute links throughout the article
+7. VERIFY each URL exists in the AVAILABLE ARTICLES list before using it
 
 OUTPUT ONLY THE UPDATED CONTENT with the ${linksToAdd} new links added.
 Do not include any explanation or commentary.`

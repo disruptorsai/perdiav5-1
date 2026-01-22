@@ -44,6 +44,7 @@ class GrokClient {
       authorProfile = null,
       authorName = null,
       contentRulesContext = null,
+      userSpecifiedContext = null, // Schools/programs from idea title/description
     } = options
 
     try {
@@ -55,6 +56,7 @@ class GrokClient {
         authorProfile,
         authorName,
         contentRulesContext,
+        userSpecifiedContext,
       })
 
       return result

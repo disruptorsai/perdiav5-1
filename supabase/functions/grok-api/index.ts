@@ -152,7 +152,8 @@ You MUST follow these rules to avoid generating fabricated content:
 3. NEVER FABRICATE SCHOOL NAMES:
    - NEVER invent school names or use placeholder names like "University A, B, C"
    - NEVER use template markers like "[School Name]" or "[University]"
-   - GOOD: Only mention schools if specific data is provided in the prompt, or use "many accredited online programs"
+   - EXCEPTION: If USER-SPECIFIED CONTEXT section is provided below, those schools ARE verified and SHOULD be mentioned
+   - GOOD: Only mention schools if specific data is provided in the prompt, in USER-SPECIFIED CONTEXT, or use "many accredited online programs"
 
 4. NEVER FABRICATE LEGISLATION:
    - NEVER cite specific bills (SB-1001, HB-123), acts, or legal codes unless provided
@@ -181,10 +182,11 @@ interface DraftOptions {
   authorProfile?: string | null
   authorName?: string | null
   contentRulesContext?: string | null
+  userSpecifiedContext?: string | null  // Schools, programs, or specific entities mentioned in the idea
 }
 
 function buildDraftPrompt(options: DraftOptions): string {
-  const { idea, contentType, targetWordCount, costDataContext, authorProfile, authorName, contentRulesContext } = options
+  const { idea, contentType, targetWordCount, costDataContext, authorProfile, authorName, contentRulesContext, userSpecifiedContext } = options
 
   let costDataSection = ''
   if (costDataContext) {
@@ -202,10 +204,26 @@ function buildDraftPrompt(options: DraftOptions): string {
     dynamicRulesSection = `\n${contentRulesContext}\n`
   }
 
+  // User-specified context (schools, programs, etc. from idea title/description)
+  // These are VERIFIED by the user and should be included in the article
+  let userContextSection = ''
+  if (userSpecifiedContext) {
+    userContextSection = `
+=== USER-SPECIFIED CONTEXT (VERIFIED - USE THESE) ===
+The following schools, programs, or entities were EXPLICITLY mentioned by the user in their content idea.
+These are VERIFIED and SHOULD be prominently featured in the article:
+
+${userSpecifiedContext}
+
+Write the article with a focus on these user-specified schools/programs. They are the main subject of this article.
+=== END USER-SPECIFIED CONTEXT ===
+`
+  }
+
   return `Generate a comprehensive ${contentType} article based on this content idea for GetEducated.com, an online education resource.
 
 ${ANTI_HALLUCINATION_RULES}
-${costDataSection}${authorSection}
+${userContextSection}${costDataSection}${authorSection}
 
 CONTENT IDEA:
 Title: ${idea.title}
@@ -378,6 +396,7 @@ serve(async (req) => {
           authorProfile = null,
           authorName = null,
           contentRulesContext = null,
+          userSpecifiedContext = null,
         } = payload
 
         if (!idea) {
@@ -394,6 +413,7 @@ serve(async (req) => {
           authorProfile,
           authorName,
           contentRulesContext,
+          userSpecifiedContext,
         })
 
         // Build system prompt with optional author profile

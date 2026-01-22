@@ -14,10 +14,48 @@
 // Use Edge Function client for secure server-side API calls
 // API keys are stored in Supabase secrets, not exposed to browser
 import ClaudeClient from './ai/claudeClient.edge'
+import { validateContent, BLOCKED_COMPETITORS, ALLOWED_EXTERNAL_DOMAINS } from './validation/linkValidator'
 
 class SurgicalRevisionService {
   constructor() {
     this.claudeClient = new ClaudeClient()
+    // Track rejected links so AI knows what to avoid
+    this.rejectedLinks = new Set()
+  }
+
+  /**
+   * Add a link to the rejected list (called when validation fails)
+   */
+  addRejectedLink(url) {
+    this.rejectedLinks.add(url)
+  }
+
+  /**
+   * Clear rejected links (call at start of new revision session)
+   */
+  clearRejectedLinks() {
+    this.rejectedLinks.clear()
+  }
+
+  /**
+   * Get linking rules for AI prompts
+   */
+  getLinkingRules() {
+    let rules = `
+CRITICAL LINKING RULES:
+- NEVER use competitor domains: ${BLOCKED_COMPETITORS.slice(0, 5).join(', ')}, etc.
+- NEVER link directly to .edu domains
+- For external links, ONLY use: bls.gov, ed.gov, nces.ed.gov, or other government/nonprofit sources
+- For internal links, ONLY use geteducated.com URLs`
+
+    if (this.rejectedLinks.size > 0) {
+      rules += `
+
+PREVIOUSLY REJECTED LINKS (DO NOT USE THESE):
+${Array.from(this.rejectedLinks).slice(0, 10).join('\n')}`
+    }
+
+    return rules
   }
 
   /**
@@ -237,6 +275,10 @@ class SurgicalRevisionService {
     // Extract just the relevant section to minimize context
     const contextWindow = this.extractRelevantContext(content, selectedText)
 
+    // Check if feedback is about links
+    const isLinkFeedback = /link|url|source|cite|citation|href|competitor/i.test(feedback)
+    const linkingRules = isLinkFeedback ? this.getLinkingRules() : ''
+
     const prompt = `You are making a single, precise edit to article content.
 
 SELECTED TEXT TO MODIFY:
@@ -244,6 +286,7 @@ SELECTED TEXT TO MODIFY:
 
 EDITORIAL FEEDBACK:
 ${feedback}
+${linkingRules}
 
 SURROUNDING CONTEXT:
 ${contextWindow.context}
@@ -253,6 +296,8 @@ Replace or modify the SELECTED TEXT based on the editorial feedback.
 - Find "${selectedText}" in the context and apply the requested change
 - If feedback says to change/replace something, do exactly that replacement
 - If feedback suggests a correction, make that specific correction
+- If feedback asks for a credible source, use BLS.gov, ED.gov, or similar government sources
+- If you cannot find a credible source, rewrite the text to not require a citation
 - Keep everything else in the context EXACTLY the same
 - Return the complete surrounding context with ONLY the targeted change applied
 - Return raw HTML only, no markdown code blocks, no explanations
@@ -273,7 +318,33 @@ OUTPUT:`
         .trim()
 
       // Replace the context section in the original content
-      const newContent = content.replace(contextWindow.context, revisedContext)
+      let newContent = content.replace(contextWindow.context, revisedContext)
+
+      // POST-REVISION LINK VALIDATION
+      // Check if any blocked links were introduced
+      if (newContent !== content) {
+        const linkValidation = validateContent(newContent)
+        if (!linkValidation.isCompliant) {
+          console.warn('[SurgicalRevision] AI added blocked links:', linkValidation.blockingIssues)
+          // Track these as rejected so future revisions avoid them
+          for (const issue of linkValidation.blockingIssues) {
+            this.addRejectedLink(issue.url)
+          }
+          // Remove the blocked links
+          for (const issue of linkValidation.blockingIssues) {
+            const linkRegex = new RegExp(`<a[^>]*href=["']${issue.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>[^<]*</a>`, 'gi')
+            newContent = newContent.replace(linkRegex, issue.anchorText || '')
+          }
+          // Return with warning
+          return {
+            success: true,
+            content: newContent,
+            method: 'ai_contextual_link_fixed',
+            changeDescription: `AI applied change but blocked links were removed: ${linkValidation.blockingIssues.map(i => i.url).join(', ')}`,
+            linkWarning: 'Blocked links were automatically removed. Please review.',
+          }
+        }
+      }
 
       // Validate the change was made
       if (newContent === content) {
@@ -299,6 +370,10 @@ OUTPUT:`
    * Still uses minimal prompt but with full article
    */
   async performFullAIRevision(content, selectedText, feedback) {
+    // Check if feedback is about links
+    const isLinkFeedback = /link|url|source|cite|citation|href|competitor/i.test(feedback)
+    const linkingRules = isLinkFeedback ? this.getLinkingRules() : ''
+
     const prompt = `Make ONE precise edit to this HTML content.
 
 SELECTED TEXT TO MODIFY:
@@ -306,6 +381,7 @@ SELECTED TEXT TO MODIFY:
 
 EDITORIAL FEEDBACK:
 ${feedback}
+${linkingRules}
 
 FULL CONTENT:
 ${content}
@@ -314,10 +390,12 @@ RULES:
 1. Find the SELECTED TEXT in the content
 2. Apply the editorial feedback to modify/replace that specific text
 3. If feedback says "change X to Y" or "should be Y", replace X with Y
-4. Keep ALL other content exactly the same - do not rewrite anything else
-5. Preserve all HTML tags and structure exactly
-6. Return the COMPLETE HTML with only the single targeted change
-7. Do NOT summarize or shorten the content
+4. If feedback asks for a credible source, use BLS.gov, ED.gov, or similar government sources
+5. If you cannot find a credible source, rewrite the text to not require a citation
+6. Keep ALL other content exactly the same - do not rewrite anything else
+7. Preserve all HTML tags and structure exactly
+8. Return the COMPLETE HTML with only the single targeted change
+9. Do NOT summarize or shorten the content
 
 OUTPUT:`
 
@@ -329,10 +407,22 @@ OUTPUT:`
         max_tokens: 16000,
       })
 
-      const revisedContent = response.trim()
+      let revisedContent = response.trim()
         .replace(/^```html?\s*/i, '')
         .replace(/```\s*$/i, '')
         .trim()
+
+      // POST-REVISION LINK VALIDATION
+      const linkValidation = validateContent(revisedContent)
+      if (!linkValidation.isCompliant) {
+        console.warn('[SurgicalRevision] Full revision added blocked links:', linkValidation.blockingIssues)
+        // Track and remove blocked links
+        for (const issue of linkValidation.blockingIssues) {
+          this.addRejectedLink(issue.url)
+          const linkRegex = new RegExp(`<a[^>]*href=["']${issue.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>[^<]*</a>`, 'gi')
+          revisedContent = revisedContent.replace(linkRegex, issue.anchorText || '')
+        }
+      }
 
       // Validate word count didn't change dramatically
       const originalWords = this.countWords(content)

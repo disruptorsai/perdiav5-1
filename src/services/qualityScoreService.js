@@ -287,9 +287,10 @@ export async function batchRecalculateQualityScores(onProgress = null) {
 
   try {
     // Fetch all articles with content
+    // Include contributor_id for the "author assigned" check
     const { data: articles, error } = await supabase
       .from('articles')
-      .select('id, content, faqs, target_keywords, focus_keyword, quality_score')
+      .select('id, content, contributor_id, quality_score')
       .not('content', 'is', null)
 
     if (error) {
