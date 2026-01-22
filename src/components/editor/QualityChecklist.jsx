@@ -1,12 +1,33 @@
-import { CheckCircle, XCircle, AlertCircle, Loader2, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { CheckCircle, XCircle, AlertCircle, Loader2, Sparkles, Shield, ShieldAlert } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { calculateQualityScore, getQualityThresholds } from '../../services/qualityScoreService'
 
 /**
  * Quality Checklist Component
+ *
+ * UNIFIED v2: Uses qualityScoreService for consistent scoring across all UI
+ *
  * Displays article quality metrics and provides auto-fix capability
  */
 function QualityChecklist({ article, onAutoFix }) {
   const [isFixing, setIsFixing] = useState(false)
+  const [qualityData, setQualityData] = useState(null)
+
+  // Calculate quality score using unified service
+  useEffect(() => {
+    async function calculateScore() {
+      if (!article?.content) {
+        setQualityData(null)
+        return
+      }
+
+      const thresholds = await getQualityThresholds()
+      const result = calculateQualityScore(article.content, article, thresholds)
+      setQualityData(result)
+    }
+
+    calculateScore()
+  }, [article?.content, article?.contributor_id])
 
   if (!article) {
     return (
@@ -16,9 +37,18 @@ function QualityChecklist({ article, onAutoFix }) {
     )
   }
 
-  // Calculate metrics from article
-  const metrics = calculateMetrics(article)
-  const issues = identifyIssues(metrics, article)
+  if (!qualityData) {
+    return (
+      <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          <p className="text-gray-500 text-sm">Calculating quality score...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const { score, checks, issues, canPublish } = qualityData
 
   const handleAutoFix = async () => {
     if (!onAutoFix || issues.length === 0) return
@@ -38,65 +68,63 @@ function QualityChecklist({ article, onAutoFix }) {
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900 mb-2">Quality Checklist</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-gray-900">Quality Checklist</h3>
+          {canPublish ? (
+            <div className="flex items-center space-x-1 text-green-600">
+              <Shield className="w-4 h-4" />
+              <span className="text-xs font-medium">Ready</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1 text-red-600">
+              <ShieldAlert className="w-4 h-4" />
+              <span className="text-xs font-medium">Blocked</span>
+            </div>
+          )}
+        </div>
         <div className="flex items-baseline space-x-2">
-          <div className={`text-4xl font-bold ${getScoreColor(article.quality_score)}`}>
-            {article.quality_score || 0}
+          <div className={`text-4xl font-bold ${getScoreColor(score)}`}>
+            {score}
           </div>
           <div className="text-gray-600">/100</div>
         </div>
+        <p className="text-xs text-gray-500 mt-1">
+          {Object.values(checks).filter(c => c.passed).length} of {Object.keys(checks).length} checks passed
+        </p>
       </div>
 
-      {/* Metrics List */}
+      {/* Checks List */}
       <div className="p-6 space-y-4">
-        <MetricItem
-          label="Word Count"
-          value={metrics.wordCount}
-          target="1500-2500 words"
-          passed={metrics.wordCount >= 1500 && metrics.wordCount <= 2500}
-          severity={metrics.wordCount < 1500 ? 'major' : 'minor'}
-        />
-
-        <MetricItem
-          label="Internal Links"
-          value={`${metrics.internalLinks} links`}
-          target="3-5 links"
-          passed={metrics.internalLinks >= 3 && metrics.internalLinks <= 5}
-          severity="major"
-        />
-
-        <MetricItem
-          label="External Links"
-          value={`${metrics.externalLinks} citations`}
-          target="2-4 citations"
-          passed={metrics.externalLinks >= 2 && metrics.externalLinks <= 4}
-          severity="minor"
-        />
-
-        <MetricItem
-          label="FAQ Section"
-          value={`${metrics.faqCount} questions`}
-          target="3+ questions"
-          passed={metrics.faqCount >= 3}
-          severity="minor"
-        />
-
-        <MetricItem
-          label="Heading Structure"
-          value={`${metrics.headingCount} headings`}
-          target="3+ H2 headings"
-          passed={metrics.headingCount >= 3}
-          severity="minor"
-        />
-
-        <MetricItem
-          label="Readability"
-          value={`${metrics.avgSentenceLength.toFixed(0)} words/sentence`}
-          target="≤25 words/sentence"
-          passed={metrics.avgSentenceLength <= 25}
-          severity="minor"
-        />
+        {Object.entries(checks).map(([key, check]) => (
+          <MetricItem
+            key={key}
+            label={check.label}
+            value={check.value}
+            passed={check.passed}
+            critical={check.critical}
+            issue={check.issue}
+          />
+        ))}
       </div>
+
+      {/* Critical Failure Warning */}
+      {!canPublish && (
+        <div className="px-6 pb-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <ShieldAlert className="w-5 h-5 text-red-600 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-medium text-red-900">
+                  Cannot Publish
+                </h4>
+                <p className="text-xs text-red-700 mt-1">
+                  Critical issues must be resolved before publishing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Issues Summary */}
       {issues.length > 0 && (
@@ -110,8 +138,8 @@ function QualityChecklist({ article, onAutoFix }) {
                 </h4>
                 <ul className="text-sm text-yellow-800 space-y-1">
                   {issues.map((issue, index) => (
-                    <li key={index} className="flex items-center space-x-2">
-                      <span className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></span>
+                    <li key={index} className="flex items-start space-x-2">
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1.5 ${issue.critical ? 'bg-red-600' : 'bg-yellow-600'}`}></span>
                       <span>{issue.description}</span>
                     </li>
                   ))}
@@ -173,29 +201,29 @@ function QualityChecklist({ article, onAutoFix }) {
 /**
  * Individual Metric Item
  */
-function MetricItem({ label, value, target, passed, severity }) {
+function MetricItem({ label, value, passed, critical, issue }) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex-1">
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-gray-900">{label}</span>
-          {severity === 'major' && !passed && (
+          {critical && !passed && (
             <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">
               Critical
             </span>
           )}
         </div>
-        <div className="flex items-center space-x-2 mt-1">
-          <span className="text-xs text-gray-600">{value}</span>
-          <span className="text-xs text-gray-400">→</span>
-          <span className="text-xs text-gray-500">{target}</span>
+        <div className="mt-1">
+          <span className={`text-xs ${passed ? 'text-green-600' : critical ? 'text-red-600' : 'text-yellow-600'}`}>
+            {value}
+          </span>
         </div>
       </div>
       <div>
         {passed ? (
           <CheckCircle className="w-5 h-5 text-green-600" />
         ) : (
-          <XCircle className={`w-5 h-5 ${severity === 'major' ? 'text-red-600' : 'text-yellow-600'}`} />
+          <XCircle className={`w-5 h-5 ${critical ? 'text-red-600' : 'text-yellow-600'}`} />
         )}
       </div>
     </div>
@@ -203,108 +231,12 @@ function MetricItem({ label, value, target, passed, severity }) {
 }
 
 /**
- * Calculate metrics from article content
- */
-function calculateMetrics(article) {
-  const content = article.content || ''
-
-  // Strip HTML for text analysis
-  const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-  const wordCount = textContent.split(' ').filter(w => w.length > 0).length
-
-  // Count links
-  const internalLinks = (content.match(/<a\s+(?:[^>]*?\s+)?href=["'][^"']*["']/gi) || []).length
-  const externalLinks = (content.match(/href=["']https?:\/\//gi) || []).length
-
-  // Count FAQs
-  const faqCount = article.faqs?.length || 0
-
-  // Count headings
-  const headingCount = (content.match(/<h2/gi) || []).length
-
-  // Calculate average sentence length
-  const sentences = textContent.split(/[.!?]+/).filter(s => s.trim().length > 0)
-  const avgSentenceLength = sentences.length > 0 ? wordCount / sentences.length : 0
-
-  return {
-    wordCount,
-    internalLinks,
-    externalLinks,
-    faqCount,
-    headingCount,
-    avgSentenceLength,
-  }
-}
-
-/**
- * Identify issues based on metrics
- */
-function identifyIssues(metrics) {
-  const issues = []
-
-  if (metrics.wordCount < 1500) {
-    issues.push({
-      type: 'word_count_low',
-      severity: 'major',
-      description: `Article is too short (${metrics.wordCount} words). Aim for 1500-2500 words.`,
-    })
-  } else if (metrics.wordCount > 2500) {
-    issues.push({
-      type: 'word_count_high',
-      severity: 'minor',
-      description: `Article is too long (${metrics.wordCount} words). Consider condensing.`,
-    })
-  }
-
-  if (metrics.internalLinks < 3) {
-    issues.push({
-      type: 'missing_internal_links',
-      severity: 'major',
-      description: `Missing internal links. Add ${3 - metrics.internalLinks} more.`,
-    })
-  }
-
-  if (metrics.externalLinks < 2) {
-    issues.push({
-      type: 'missing_external_links',
-      severity: 'minor',
-      description: `Missing external citations. Add ${2 - metrics.externalLinks} more.`,
-    })
-  }
-
-  if (metrics.faqCount < 3) {
-    issues.push({
-      type: 'missing_faqs',
-      severity: 'minor',
-      description: `Missing FAQ section. Add ${3 - metrics.faqCount} more questions.`,
-    })
-  }
-
-  if (metrics.headingCount < 3) {
-    issues.push({
-      type: 'weak_headings',
-      severity: 'minor',
-      description: `Weak heading structure. Add ${3 - metrics.headingCount} more H2 headings.`,
-    })
-  }
-
-  if (metrics.avgSentenceLength > 25) {
-    issues.push({
-      type: 'poor_readability',
-      severity: 'minor',
-      description: `Readability could be improved. Shorten some sentences.`,
-    })
-  }
-
-  return issues
-}
-
-/**
  * Get color class based on quality score
+ * UNIFIED: Uses same thresholds as other UI components (80/60)
  */
 function getScoreColor(score) {
-  if (score >= 85) return 'text-green-600'
-  if (score >= 75) return 'text-yellow-600'
+  if (score >= 80) return 'text-green-600'
+  if (score >= 60) return 'text-yellow-600'
   return 'text-red-600'
 }
 

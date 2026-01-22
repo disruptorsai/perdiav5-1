@@ -16,7 +16,7 @@ export default function QualityChecklist({ article, content, onQualityChange, on
   const [canPublish, setCanPublish] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
 
-  const { getIntValue, getBoolValue, getFloatValue } = useSettingsMap()
+  const { getIntValue, getBoolValue } = useSettingsMap()
 
   useEffect(() => {
     if (!content) {
@@ -29,21 +29,14 @@ export default function QualityChecklist({ article, content, onQualityChange, on
     }
 
     // Build thresholds from system settings for the unified service
+    // SIMPLIFIED v2: Only 6 checks now (word count, internal links, external links, headings, banned links, author)
     const thresholds = {
       minWordCount: getIntValue('min_word_count', 800),
       maxWordCount: getIntValue('max_word_count', 2500),
       minInternalLinks: getIntValue('min_internal_links', 3),
       minExternalLinks: getIntValue('min_external_links', 1),
-      requireBLS: getBoolValue('require_bls_citation', false),
-      requireFAQ: getBoolValue('require_faq_schema', false),
       requireHeadings: getBoolValue('require_headings', true),
       minHeadingCount: getIntValue('min_heading_count', 3),
-      minImages: getIntValue('min_images', 1),
-      requireImageAlt: getBoolValue('require_image_alt_text', true),
-      keywordDensityMin: getFloatValue('keyword_density_min', 0.5),
-      keywordDensityMax: getFloatValue('keyword_density_max', 2.5),
-      minReadability: getIntValue('min_readability_score', 60),
-      maxReadability: getIntValue('max_readability_score', 80),
     }
 
     // Use the unified quality score service
@@ -59,7 +52,7 @@ export default function QualityChecklist({ article, content, onQualityChange, on
       checks: result.checks,
       issues: result.issues
     })
-  }, [content, article, getIntValue, getBoolValue, getFloatValue, onQualityChange])
+  }, [content, article, getIntValue, getBoolValue, onQualityChange])
 
   const handleAutoFix = async () => {
     if (!onAutoFix) return

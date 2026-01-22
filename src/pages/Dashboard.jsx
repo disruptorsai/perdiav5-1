@@ -1091,11 +1091,11 @@ function SortableArticleCard({ article, onClick, onStatusChange, onApprove, inde
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   className={`px-2 py-1 rounded cursor-help ${
-                    article.quality_score >= 85 ? 'bg-green-100 text-green-700' :
-                    article.quality_score >= 75 ? 'bg-yellow-100 text-yellow-700' :
+                    article.quality_score >= 80 ? 'bg-green-100 text-green-700' :
+                    article.quality_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
                     'bg-red-100 text-red-700'
                   }`}
-                  title={`Quality Score: ${article.quality_score}/100. Measures word count, internal links, external citations, FAQs, and readability. Green (85+) = Excellent, Yellow (75-84) = Good, Red (<75) = Needs improvement.`}
+                  title={`Quality Score: ${article.quality_score}/100. Checks word count, internal links, external citations, headings, banned links, and author. Green (80+) = Ready, Yellow (60-79) = Review, Red (<60) = Issues.`}
                 >
                   {article.quality_score}
                 </motion.span>

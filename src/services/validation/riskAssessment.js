@@ -2,20 +2,20 @@
  * Risk Assessment Service for GetEducated
  * Calculates risk level for articles based on content quality and compliance
  *
- * Risk Levels:
- * - LOW: Safe for auto-publish (score >= 85, no blocking issues)
- * - MEDIUM: Review recommended (score 70-84 or minor warnings)
- * - HIGH: Review required (score < 70, or major issues)
+ * Risk Levels (aligned with unified quality score thresholds):
+ * - LOW: Safe for auto-publish (score >= 80, no blocking issues)
+ * - MEDIUM: Review recommended (score 60-79 or minor warnings)
+ * - HIGH: Review required (score < 60, or major issues)
  * - CRITICAL: Publish blocked (blocking compliance issues)
  */
 
 import { validateContent } from './linkValidator'
 
-// Risk level thresholds
+// Risk level thresholds (matches quality score color thresholds)
 const RISK_THRESHOLDS = {
-  LOW: 85,      // Quality score >= 85 with no issues
-  MEDIUM: 70,   // Quality score 70-84 or minor issues
-  HIGH: 0,      // Quality score < 70 or major issues
+  LOW: 80,      // Quality score >= 80 with no issues (green)
+  MEDIUM: 60,   // Quality score 60-79 or minor issues (yellow)
+  HIGH: 0,      // Quality score < 60 or major issues (red)
   // CRITICAL is set when blocking issues are present
 }
 

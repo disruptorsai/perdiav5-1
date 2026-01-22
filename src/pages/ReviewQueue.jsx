@@ -555,9 +555,9 @@ export default function ReviewQueue() {
                               <Badge
                                 variant="outline"
                                 className={`${
-                                  article.quality_score >= 85
+                                  article.quality_score >= 80
                                     ? 'bg-green-50 text-green-700 border-green-200'
-                                    : article.quality_score >= 70
+                                    : article.quality_score >= 60
                                       ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
                                       : 'bg-red-50 text-red-700 border-red-200'
                                 }`}

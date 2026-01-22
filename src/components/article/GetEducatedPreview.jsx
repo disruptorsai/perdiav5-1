@@ -506,9 +506,9 @@ const GetEducatedPreview = forwardRef(function GetEducatedPreview(
             {article?.quality_score !== undefined && (
               <span
                 className={`ge-quality-badge ${
-                  article.quality_score >= 85
+                  article.quality_score >= 80
                     ? 'ge-quality-good'
-                    : article.quality_score >= 70
+                    : article.quality_score >= 60
                       ? 'ge-quality-warning'
                       : 'ge-quality-poor'
                 }`}

@@ -141,17 +141,23 @@ function ArticleEditorContent() {
   const [pendingRevision, setPendingRevision] = useState(null) // { previousContent, revisedContent, feedbackItems, timestamp }
 
   // Update local state when article loads
+  // BUG FIX: Don't overwrite content when there's a pending AI revision
+  // The pendingRevision contains the revised content that user is reviewing
   useEffect(() => {
     if (article) {
       setTitle(article.title || '')
-      setContent(article.content || '')
+      // Only update content if there's no pending revision being reviewed
+      // This prevents React Query refetches from wiping out AI-revised content
+      if (!pendingRevision) {
+        setContent(article.content || '')
+      }
       setMetaDescription(article.meta_description || '')
       setFocusKeyword(article.focus_keyword || '')
       setContentType(article.content_type || 'guide')
       setSelectedContributorId(article.contributor_id || null)
       setFaqs(article.faqs || [])
     }
-  }, [article])
+  }, [article, pendingRevision])
 
   // Calculate word count using TipTap helper
   const wordCount = useMemo(() => getWordCount(content), [content])

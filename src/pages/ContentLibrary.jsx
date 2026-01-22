@@ -107,8 +107,8 @@ function ContentLibrary() {
               <div className="flex items-center gap-2">
                 {article.quality_score > 0 && (
                   <span className={`px-2 py-1 text-xs rounded ${
-                    article.quality_score >= 85 ? 'bg-green-100 text-green-700' :
-                    article.quality_score >= 75 ? 'bg-yellow-100 text-yellow-700' :
+                    article.quality_score >= 80 ? 'bg-green-100 text-green-700' :
+                    article.quality_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
                     'bg-red-100 text-red-700'
                   }`}>
                     {article.quality_score}

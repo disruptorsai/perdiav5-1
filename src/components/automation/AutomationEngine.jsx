@@ -249,8 +249,8 @@ export default function AutomationEngine({
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{article.word_count} words</Badge>
                         <Badge className={`
-                          ${article.quality_score >= 85 ? 'bg-green-100 text-green-700' :
-                            article.quality_score >= 75 ? 'bg-yellow-100 text-yellow-700' :
+                          ${article.quality_score >= 80 ? 'bg-green-100 text-green-700' :
+                            article.quality_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
                             'bg-red-100 text-red-700'}
                         `}>
                           {article.quality_score}

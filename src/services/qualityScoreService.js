@@ -5,9 +5,21 @@
  * Both generation pipeline and editor must use this service to ensure consistency.
  *
  * The score shown in lists MUST match the score shown in article editor.
+ *
+ * SIMPLIFIED CHECKS (v2 - Jan 2026):
+ * Only checks what GetEducated actually cares about:
+ * 1. Word Count (800-2500) - Basic length
+ * 2. Internal Links (3+) - CRITICAL for monetization
+ * 3. External Citations (1+) - BLS/gov sources
+ * 4. Headings (3+ H2/H3) - Structure
+ * 5. No Banned Links (.edu/competitors) - CRITICAL client requirement
+ * 6. Author Assigned - Attribution
+ *
+ * REMOVED: Images, keyword density, readability score, FAQ schema
  */
 
 import { supabase } from './supabaseClient'
+import { validateContent, BLOCKED_COMPETITORS } from './validation/linkValidator'
 
 // Default thresholds (used when system_settings unavailable)
 const DEFAULT_THRESHOLDS = {
@@ -15,16 +27,8 @@ const DEFAULT_THRESHOLDS = {
   maxWordCount: 2500,
   minInternalLinks: 3,
   minExternalLinks: 1,
-  requireBLS: false,
-  requireFAQ: false,
   requireHeadings: true,
   minHeadingCount: 3,
-  minImages: 1,
-  requireImageAlt: true,
-  keywordDensityMin: 0.5,
-  keywordDensityMax: 2.5,
-  minReadability: 60,
-  maxReadability: 80,
 }
 
 // Cache for system settings
@@ -60,21 +64,14 @@ export async function getQualityThresholds() {
       settingsMap[row.key] = row.value
     })
 
+    // Simplified thresholds - only what GetEducated cares about
     const thresholds = {
       minWordCount: parseInt(settingsMap.min_word_count) || DEFAULT_THRESHOLDS.minWordCount,
       maxWordCount: parseInt(settingsMap.max_word_count) || DEFAULT_THRESHOLDS.maxWordCount,
       minInternalLinks: parseInt(settingsMap.min_internal_links) || DEFAULT_THRESHOLDS.minInternalLinks,
       minExternalLinks: parseInt(settingsMap.min_external_links) || DEFAULT_THRESHOLDS.minExternalLinks,
-      requireBLS: settingsMap.require_bls_citation === 'true',
-      requireFAQ: settingsMap.require_faq_schema === 'true',
       requireHeadings: settingsMap.require_headings !== 'false',
       minHeadingCount: parseInt(settingsMap.min_heading_count) || DEFAULT_THRESHOLDS.minHeadingCount,
-      minImages: parseInt(settingsMap.min_images) || DEFAULT_THRESHOLDS.minImages,
-      requireImageAlt: settingsMap.require_image_alt_text !== 'false',
-      keywordDensityMin: parseFloat(settingsMap.keyword_density_min) || DEFAULT_THRESHOLDS.keywordDensityMin,
-      keywordDensityMax: parseFloat(settingsMap.keyword_density_max) || DEFAULT_THRESHOLDS.keywordDensityMax,
-      minReadability: parseInt(settingsMap.min_readability_score) || DEFAULT_THRESHOLDS.minReadability,
-      maxReadability: parseInt(settingsMap.max_readability_score) || DEFAULT_THRESHOLDS.maxReadability,
     }
 
     // Update cache
@@ -99,8 +96,13 @@ export function clearQualitySettingsCache() {
 /**
  * Calculate quality metrics for an article
  *
+ * SIMPLIFIED v2: Only checks what GetEducated actually cares about
+ * - Word count, internal links (CRITICAL), external citations, headings
+ * - Banned links (.edu, competitors) - CRITICAL
+ * - Author assignment
+ *
  * @param {string} content - HTML content of the article
- * @param {Object} article - Article object (for FAQs, keywords, etc.)
+ * @param {Object} article - Article object (for contributor, etc.)
  * @param {Object} thresholds - Quality thresholds (optional, will fetch from DB if not provided)
  * @returns {Object} - { score, checks, issues, canPublish }
  */
@@ -117,60 +119,26 @@ export function calculateQualityScore(content, article = {}, thresholds = DEFAUL
 
   const t = thresholds
 
-  // Calculate metrics
+  // Calculate basic metrics
   const plainText = content.replace(/<[^>]*>/g, '')
   const wordCount = plainText.split(/\s+/).filter(w => w).length
 
-  // Count links
-  const allLinks = content.match(/<a\s+[^>]*href=["'][^"']+["'][^>]*>/gi) || []
-  const internalLinks = allLinks.filter(link =>
-    link.includes('geteducated.com') ||
-    link.includes('localhost') ||
-    link.match(/href=["']\/[^"']*["']/)
-  ).length
-  const externalLinks = allLinks.length - internalLinks
-
-  // FAQ check
-  const hasSchema = article?.faqs && article.faqs.length > 0
-  const faqCount = article?.faqs?.length || 0
-
-  // BLS citation
-  const hasBLSCitation = content.toLowerCase().includes('bls.gov') ||
-                         content.toLowerCase().includes('bureau of labor')
+  // Use link validator for comprehensive link analysis
+  const linkValidation = validateContent(content)
+  const internalLinks = linkValidation.internalLinks
+  const externalLinks = linkValidation.externalLinks
+  const hasBannedLinks = !linkValidation.isCompliant
+  const bannedLinkCount = linkValidation.blockingIssues.length
 
   // Headings
   const h2Count = (content.match(/<h2/gi) || []).length
   const h3Count = (content.match(/<h3/gi) || []).length
   const totalHeadings = h2Count + h3Count
 
-  // Images
-  const imageMatches = content.match(/<img[^>]*>/gi) || []
-  const imageCount = imageMatches.length
-  const imagesWithAlt = imageMatches.filter(img => /alt=["'][^"']+["']/i.test(img)).length
+  // Author assignment check
+  const hasAuthor = !!(article?.contributor_id || article?.article_contributors)
 
-  // Keyword density
-  let keywordDensity = 0
-  const targetKeywords = article?.target_keywords || article?.focus_keyword
-  if (targetKeywords && wordCount > 0) {
-    const primaryKeyword = Array.isArray(targetKeywords)
-      ? targetKeywords[0]?.toLowerCase()
-      : targetKeywords.toLowerCase()
-    if (primaryKeyword) {
-      const keywordOccurrences = (plainText.toLowerCase().match(new RegExp(primaryKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
-      keywordDensity = (keywordOccurrences / wordCount) * 100
-    }
-  }
-
-  // Readability (Flesch Reading Ease)
-  const sentences = plainText.split(/[.!?]+/).filter(s => s.trim()).length
-  const syllables = plainText.split(/\s+/).reduce((count, word) => {
-    return count + (word.replace(/[^aeiou]/gi, '').length || 1)
-  }, 0)
-  const readabilityScore = sentences > 0 && wordCount > 0
-    ? Math.max(0, Math.min(100, 206.835 - 1.015 * (wordCount / sentences) - 84.6 * (syllables / wordCount)))
-    : 50
-
-  // Build checks object
+  // Build checks object - SIMPLIFIED to 6 checks
   const checks = {
     wordCount: {
       passed: wordCount >= t.minWordCount && wordCount <= t.maxWordCount,
@@ -191,7 +159,7 @@ export function calculateQualityScore(content, article = {}, thresholds = DEFAUL
       label: `At least ${t.minInternalLinks} internal links`,
       value: `${internalLinks} link${internalLinks !== 1 ? 's' : ''}`,
       issue: internalLinks < t.minInternalLinks
-        ? `Add ${t.minInternalLinks - internalLinks} more internal link(s)`
+        ? `Add ${t.minInternalLinks - internalLinks} more internal link(s) to GetEducated`
         : null
     },
     externalLinks: {
@@ -201,24 +169,8 @@ export function calculateQualityScore(content, article = {}, thresholds = DEFAUL
       label: `At least ${t.minExternalLinks} external citation${t.minExternalLinks !== 1 ? 's' : ''}`,
       value: `${externalLinks} citation${externalLinks !== 1 ? 's' : ''}`,
       issue: externalLinks < t.minExternalLinks
-        ? `Add ${t.minExternalLinks - externalLinks} more external citation(s)`
+        ? `Add ${t.minExternalLinks - externalLinks} external citation(s) (BLS, gov sites)`
         : null
-    },
-    schema: {
-      passed: !t.requireFAQ || hasSchema,
-      critical: t.requireFAQ,
-      enabled: t.requireFAQ,
-      label: 'FAQ Schema markup',
-      value: hasSchema ? `${faqCount} FAQs` : 'Missing',
-      issue: !hasSchema && t.requireFAQ ? 'Add FAQ schema markup' : null
-    },
-    blsCitation: {
-      passed: !t.requireBLS || hasBLSCitation,
-      critical: t.requireBLS,
-      enabled: t.requireBLS,
-      label: 'BLS data citation',
-      value: hasBLSCitation ? 'Present' : 'Missing',
-      issue: !hasBLSCitation && t.requireBLS ? 'Add BLS citation' : null
     },
     headings: {
       passed: !t.requireHeadings || totalHeadings >= t.minHeadingCount,
@@ -230,54 +182,24 @@ export function calculateQualityScore(content, article = {}, thresholds = DEFAUL
         ? `Add ${t.minHeadingCount - totalHeadings} more heading(s)`
         : null
     },
-    images: {
-      passed: imageCount >= t.minImages,
-      critical: false,
-      enabled: t.minImages > 0,
-      label: `At least ${t.minImages} image${t.minImages !== 1 ? 's' : ''}`,
-      value: `${imageCount} image${imageCount !== 1 ? 's' : ''}`,
-      issue: imageCount < t.minImages
-        ? `Add ${t.minImages - imageCount} more image(s)`
+    bannedLinks: {
+      passed: !hasBannedLinks,
+      critical: true,
+      enabled: true,
+      label: 'No banned links (.edu, competitors)',
+      value: hasBannedLinks ? `${bannedLinkCount} banned link${bannedLinkCount !== 1 ? 's' : ''} found` : 'Clean',
+      issue: hasBannedLinks
+        ? `Remove ${bannedLinkCount} banned link(s): ${linkValidation.blockingIssues.map(i => i.url).slice(0, 3).join(', ')}${bannedLinkCount > 3 ? '...' : ''}`
         : null
     },
-    imageAlt: {
-      passed: !t.requireImageAlt || imageCount === 0 || imagesWithAlt === imageCount,
-      critical: false,
-      enabled: t.requireImageAlt && imageCount > 0,
-      label: 'All images have alt text',
-      value: imageCount > 0 ? `${imagesWithAlt}/${imageCount} with alt text` : 'No images',
-      issue: imagesWithAlt < imageCount && t.requireImageAlt
-        ? `Add alt text to ${imageCount - imagesWithAlt} image(s)`
-        : null
-    },
-    keywordDensity: {
-      passed: !targetKeywords || (keywordDensity >= t.keywordDensityMin && keywordDensity <= t.keywordDensityMax),
-      critical: false,
-      enabled: !!targetKeywords,
-      label: `Keyword density ${t.keywordDensityMin}%-${t.keywordDensityMax}%`,
-      value: `${keywordDensity.toFixed(2)}%`,
-      issue: targetKeywords && (keywordDensity < t.keywordDensityMin || keywordDensity > t.keywordDensityMax)
-        ? keywordDensity < t.keywordDensityMin
-          ? 'Increase keyword usage'
-          : 'Reduce keyword usage (potential stuffing)'
-        : null
-    },
-    readability: {
-      passed: readabilityScore >= t.minReadability && readabilityScore <= t.maxReadability,
+    authorAssigned: {
+      passed: hasAuthor,
       critical: false,
       enabled: true,
-      label: `Readability ${t.minReadability}-${t.maxReadability}`,
-      value: `${readabilityScore.toFixed(0)} (${
-        readabilityScore >= 70 ? 'Easy' :
-        readabilityScore >= 60 ? 'Standard' :
-        readabilityScore >= 50 ? 'Difficult' : 'Very Difficult'
-      })`,
-      issue: readabilityScore < t.minReadability
-        ? 'Simplify sentence structure'
-        : readabilityScore > t.maxReadability
-          ? 'Add more complexity for target audience'
-          : null
-    }
+      label: 'Author assigned',
+      value: hasAuthor ? 'Assigned' : 'Missing',
+      issue: !hasAuthor ? 'Assign an author/contributor' : null
+    },
   }
 
   // Filter to enabled checks only
@@ -311,6 +233,9 @@ export function calculateQualityScore(content, article = {}, thresholds = DEFAUL
     issues,
     canPublish: !criticalFailed,
     word_count: wordCount,
+    internal_links: internalLinks,
+    external_links: externalLinks,
+    has_banned_links: hasBannedLinks,
     thresholds_used: t,
   }
 }
