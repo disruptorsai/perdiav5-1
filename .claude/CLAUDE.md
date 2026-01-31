@@ -45,7 +45,7 @@ All work is automatically logged to `~/.claude/timesheet/logs/`
 |---------|--------------|-----|
 | Supabase | perdiav5 | nvffvcjtrgxnunncdafz |
 | Netlify | perdiav5 | e6c79ffe-d40e-4123-b404-ade94e4ec295 |
-| GitHub | disruptorsai/perdiav5 | - |
+| GitHub | TechIntegrationLabs/perdiav5 | - |
 
 **Live URL:** https://perdiav5.netlify.app
 **DB Host:** db.nvffvcjtrgxnunncdafz.supabase.co
