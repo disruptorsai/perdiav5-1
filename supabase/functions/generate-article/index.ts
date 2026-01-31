@@ -385,7 +385,7 @@ CRITICAL HUMANIZATION TECHNIQUES:
 OUTPUT ONLY THE REWRITTEN HTML CONTENT. DO NOT include explanations, meta-commentary, or anything other than the pure HTML article content.`
 
   const response = await client.messages.create({
-    model: 'claude-3-5-sonnet-20250122',
+    model: 'claude-sonnet-4-20250514',
     max_tokens: 4500,
     temperature: 0.9,
     messages: [{ role: 'user', content: prompt }]
@@ -454,7 +454,7 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
 
   try {
     const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20250122',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 4500,
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }]

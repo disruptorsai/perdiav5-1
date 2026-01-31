@@ -1,0 +1,15 @@
+# Ignore documentation folders
+docs/
+
+# Ignore data folders
+data/
+
+# Ignore scripts that may have different lint rules
+scripts/
+
+# Ignore build output
+dist/
+node_modules/
+
+# Ignore generated files
+*.min.js

@@ -12,7 +12,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const CLAUDE_MODEL = 'claude-3-5-sonnet-20250122'
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 
 function buildHumanizationPrompt(content: string, contributorProfile: any, perplexity: string, burstiness: string): string {
   let styleInstructions = ''
@@ -81,6 +81,22 @@ CRITICAL HUMANIZATION TECHNIQUES:
    - Preserve HTML formatting
    - Keep the same SEO focus
    - Ensure the content remains valuable and informative
+
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
 
 OUTPUT ONLY THE REWRITTEN HTML CONTENT. DO NOT include explanations, meta-commentary, or anything other than the pure HTML article content.`
 }
@@ -181,16 +197,32 @@ QUALITY ISSUES TO FIX:
 - ${issueDescriptions}
 ${internalLinksContext}
 
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
+
 INSTRUCTIONS:
 1. Fix each issue listed above
 2. For word count: Add or remove content naturally, maintaining quality
 3. For internal links: Add 3-5 contextual links to the provided articles where genuinely relevant (use HTML <a> tags)
 4. For external links: Add 2-4 citations to authoritative sources like research papers, official documentation, or reputable publications
-5. For FAQs: Add a "Frequently Asked Questions" section with at least 3 relevant Q&A pairs at the end
+5. For FAQs: Add a "Frequently Asked Questions" section with at least 3 relevant Q&A pairs at the end using proper HTML (<h2>Frequently Asked Questions</h2> followed by <h3> for questions and <p> for answers)
 6. For readability: Simplify complex sentences, break up long paragraphs, use clearer language
 7. For headings: Ensure proper H2/H3 hierarchy, make headings descriptive and keyword-rich
 8. Maintain the article's tone, style, and factual accuracy
-9. Keep all existing HTML formatting
+9. Keep all existing HTML formatting and ensure ALL new content is properly HTML formatted
 
 OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
@@ -211,7 +243,7 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
       }
 
       case 'reviseWithFeedback': {
-        const { content, feedbackItems } = payload
+        const { content, feedbackItems, availableInternalLinks = [] } = payload
 
         if (!content || !feedbackItems || !Array.isArray(feedbackItems)) {
           throw new Error('Missing required parameters: content and feedbackItems (array)')
@@ -224,6 +256,42 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
    Issue: ${item.comment}`
         }).join('\n\n')
 
+        // FIX #2: Include linking rules so AI doesn't suggest bad links
+        const linkingRules = `
+=== CRITICAL LINKING RULES (MUST FOLLOW) ===
+
+1. NEVER link directly to school websites (.edu domains)
+   - Instead, use GetEducated school profile pages: geteducated.com/online-schools/[school-name]/
+
+2. NEVER link to these COMPETITOR sites:
+   - onlineu.com, usnews.com, bestcolleges.com, niche.com
+   - collegeraptor.com, affordablecollegesonline.com
+   - collegeconfidential.com, petersons.com, princetonreview.com
+   - gradschools.com, collegexpress.com
+
+3. External links should ONLY go to:
+   - Bureau of Labor Statistics (bls.gov)
+   - Government sites (.gov)
+   - Nonprofit educational organizations
+   - Accreditation body sites (aacsb.edu, cacrep.org, etc.)
+
+4. For internal links, use GetEducated pages:
+   - geteducated.com/online-degrees/
+   - geteducated.com/online-schools/
+   - geteducated.com/online-college-ratings-and-rankings/
+
+5. If asked to add a link and you cannot find a valid source:
+   - Rewrite the sentence to remove the need for a citation
+   - Do NOT invent URLs or use blocked sources
+
+=== END LINKING RULES ===
+`
+
+        // If internal link suggestions were provided, include them
+        const internalLinkContext = availableInternalLinks.length > 0
+          ? `\nAVAILABLE INTERNAL LINKS (use these for internal linking requests):\n${availableInternalLinks.map((a: any) => `- [${a.title}](${a.url})`).join('\n')}\n`
+          : ''
+
         const prompt = `You are a content editor revising this article based on editorial feedback.
 
 CURRENT CONTENT:
@@ -231,13 +299,30 @@ ${content}
 
 EDITORIAL FEEDBACK:
 ${feedbackText}
+${linkingRules}${internalLinkContext}
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
 
 INSTRUCTIONS:
 1. Address each piece of feedback carefully
 2. Make necessary revisions to the content
 3. Maintain the overall structure and tone
 4. Keep all other content unchanged
-5. Preserve HTML formatting
+5. Preserve HTML formatting and ensure ALL new content is properly HTML formatted
+6. STRICTLY follow the linking rules above - never link to competitors or .edu sites
 
 OUTPUT ONLY THE REVISED HTML CONTENT.`
 
@@ -311,6 +396,120 @@ Generate the patterns now:`
         break
       }
 
+      case 'analyzeIdeaFeedback': {
+        const { approvedIdeas, rejectedIdeas, customNotes } = payload
+
+        console.log('Analyzing idea feedback patterns...')
+
+        const approvedContext = approvedIdeas.length > 0
+          ? `APPROVED IDEAS (what works well):
+${approvedIdeas.map((idea: any, i: number) => `${i + 1}. Title: "${idea.title}"
+   Description: ${idea.description || 'N/A'}
+   Source: ${idea.source || 'N/A'}
+   Content Type: ${idea.contentType || 'N/A'}
+   Keywords: ${idea.keywords?.join(', ') || 'N/A'}
+   Notes: ${idea.notes || 'N/A'}`).join('\n\n')}`
+          : ''
+
+        const rejectedContext = rejectedIdeas.length > 0
+          ? `REJECTED IDEAS (what to avoid):
+${rejectedIdeas.map((idea: any, i: number) => `${i + 1}. Title: "${idea.title}"
+   Description: ${idea.description || 'N/A'}
+   Source: ${idea.source || 'N/A'}
+   Content Type: ${idea.contentType || 'N/A'}
+   Keywords: ${idea.keywords?.join(', ') || 'N/A'}
+   Rejection Category: ${idea.category || 'N/A'}
+   Rejection Reason: ${idea.reason || 'N/A'}
+   Notes: ${idea.notes || 'N/A'}`).join('\n\n')}`
+          : ''
+
+        const customContext = customNotes
+          ? `USER NOTES: ${customNotes}`
+          : ''
+
+        const prompt = `You are an AI content strategist analyzing user feedback on content ideas to improve future idea generation.
+
+${approvedContext}
+
+${rejectedContext}
+
+${customContext}
+
+TASK:
+Analyze the patterns in the approved and rejected ideas to extract learnings that can improve future idea generation. Focus on:
+1. What types of topics/titles get approved vs rejected
+2. Common characteristics of good vs bad ideas
+3. Content types that work better
+4. Keywords and sources that are preferred
+5. Specific patterns in rejection reasons
+
+OUTPUT AS JSON:
+{
+  "patterns": {
+    "goodPatterns": ["Pattern 1 from approved ideas", "Pattern 2"],
+    "badPatterns": ["Pattern to avoid from rejected ideas", "Another pattern to avoid"],
+    "preferredTopics": ["Topic area 1", "Topic area 2"],
+    "avoidTopics": ["Topic to avoid 1", "Topic to avoid 2"],
+    "titlePatterns": {
+      "good": ["Good title pattern example", "Another good pattern"],
+      "bad": ["Bad title pattern to avoid", "Another bad pattern"]
+    },
+    "preferredContentTypes": ["guide", "career_guide"],
+    "preferredSources": ["reddit", "trends"],
+    "recommendations": [
+      "Actionable recommendation 1",
+      "Actionable recommendation 2",
+      "Actionable recommendation 3"
+    ]
+  },
+  "improvedPromptAdditions": "A paragraph of additional prompt instructions to add to the idea generator to incorporate these learnings"
+}
+
+Analyze now and provide the JSON:`
+
+        const response = await client.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 3000,
+          temperature: 0.6,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+
+        try {
+          // Clean up the response - remove markdown code blocks if present
+          let responseText = response.content[0].text.trim()
+          if (responseText.startsWith('```json')) {
+            responseText = responseText.slice(7)
+          } else if (responseText.startsWith('```')) {
+            responseText = responseText.slice(3)
+          }
+          if (responseText.endsWith('```')) {
+            responseText = responseText.slice(0, -3)
+          }
+          responseText = responseText.trim()
+
+          result = JSON.parse(responseText)
+        } catch {
+          // If JSON parsing fails, return a structured error response
+          result = {
+            patterns: {
+              goodPatterns: [],
+              badPatterns: [],
+              preferredTopics: [],
+              avoidTopics: [],
+              titlePatterns: { good: [], bad: [] },
+              recommendations: ['Analysis completed but could not parse patterns. Raw response available.']
+            },
+            rawResponse: response.content[0].text
+          }
+        }
+        break
+      }
+
       case 'addInternalLinks': {
         const { content, siteArticles } = payload
 
@@ -354,8 +553,31 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
         break
       }
 
+      case 'chat': {
+        const { messages, temperature = 0.7, max_tokens = 4000 } = payload
+
+        if (!messages || !Array.isArray(messages)) {
+          throw new Error('Missing required parameter: messages (array)')
+        }
+
+        console.log('Processing chat request...')
+
+        const response = await client.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: max_tokens,
+          temperature: temperature,
+          messages: messages.map((m: any) => ({
+            role: m.role,
+            content: m.content
+          }))
+        })
+
+        result = response.content[0].text
+        break
+      }
+
       default:
-        throw new Error(`Unknown action: ${action}. Valid actions: humanize, autoFixQualityIssues, reviseWithFeedback, extractLearningPatterns, addInternalLinks`)
+        throw new Error(`Unknown action: ${action}. Valid actions: humanize, autoFixQualityIssues, reviseWithFeedback, extractLearningPatterns, analyzeIdeaFeedback, addInternalLinks, chat`)
     }
 
     return new Response(

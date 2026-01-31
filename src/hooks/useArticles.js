@@ -3,7 +3,7 @@ import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
 /**
- * Fetch all articles for the current user
+ * Fetch all articles (shared workspace - all users see all articles)
  */
 export function useArticles(filters = {}) {
   const { user } = useAuth()
@@ -14,7 +14,6 @@ export function useArticles(filters = {}) {
       let query = supabase
         .from('articles')
         .select('*, article_contributors(*)')
-        .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
 
       // Apply filters
@@ -36,6 +35,8 @@ export function useArticles(filters = {}) {
       return data
     },
     enabled: !!user,
+    refetchOnMount: 'always', // Always refetch when navigating back to ensure fresh data
+    staleTime: 0, // Consider data immediately stale for navigation
   })
 }
 
@@ -143,6 +144,36 @@ export function useUpdateArticleStatus() {
       const { data, error } = await supabase
         .from('articles')
         .update({ status })
+        .eq('id', articleId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['articles'] })
+    },
+  })
+}
+
+/**
+ * Approve article for publishing (marks as human reviewed with initials)
+ */
+export function useApproveArticle() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ articleId, initials }) => {
+      const { data, error } = await supabase
+        .from('articles')
+        .update({
+          human_reviewed: true,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+          approved_by_initials: initials,
+        })
         .eq('id', articleId)
         .select()
         .single()

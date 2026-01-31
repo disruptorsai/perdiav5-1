@@ -1,0 +1,83 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=YOUR_PROJECT_REF"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_YOUR_ACCESS_TOKEN",
+        "SUPABASE_URL": "https://YOUR_PROJECT_REF.supabase.co"
+      },
+      "metadata": {
+        "description": "Supabase MCP server for Perdia v5 - provides direct database access, schema inspection, and query capabilities",
+        "project": "perdia-v5",
+        "setup_instructions": [
+          "1. Get your project ref from Supabase dashboard URL",
+          "2. Generate access token at https://supabase.com/dashboard/account/tokens",
+          "3. Replace YOUR_PROJECT_REF and YOUR_ACCESS_TOKEN"
+        ]
+      }
+    },
+    "netlify": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@netlify/mcp@latest"
+      ],
+      "env": {
+        "NETLIFY_AUTH_TOKEN": "nfp_YOUR_NETLIFY_TOKEN",
+        "NETLIFY_SITE_ID": "YOUR_SITE_ID"
+      },
+      "metadata": {
+        "description": "Netlify MCP server for Perdia v5 deployment management",
+        "project": "perdia-v5",
+        "setup_instructions": [
+          "1. Get personal access token from https://app.netlify.com/user/applications#personal-access-tokens",
+          "2. Get site ID from your Netlify site settings",
+          "3. Replace YOUR_NETLIFY_TOKEN and YOUR_SITE_ID"
+        ]
+      }
+    },
+    "dataforseo": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "dataforseo-mcp-server"
+      ],
+      "env": {
+        "DATAFORSEO_USERNAME": "your_email@example.com",
+        "DATAFORSEO_PASSWORD": "your_api_password"
+      },
+      "metadata": {
+        "description": "DataForSEO MCP server for keyword research and SEO metrics (optional)",
+        "project": "perdia-v5",
+        "setup_instructions": [
+          "1. Sign up at https://dataforseo.com/",
+          "2. Get API credentials from dashboard",
+          "3. Replace with your credentials"
+        ]
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@executeautomation/playwright-mcp-server"
+      ],
+      "env": {
+        "PLAYWRIGHT_HEADLESS": "true"
+      },
+      "metadata": {
+        "description": "Playwright MCP server for browser automation and testing deployed sites",
+        "project": "perdia-v5",
+        "setup_instructions": [
+          "1. No additional setup required",
+          "2. Set PLAYWRIGHT_HEADLESS to 'false' to see browser during tests"
+        ]
+      }
+    }
+  }
+}

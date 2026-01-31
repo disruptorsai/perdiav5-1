@@ -1,0 +1,932 @@
+[
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 285,
+    "concentration": "Anthropology"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 18,
+    "concentration": "Art & Architecture (Architecture focus)"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 384,
+    "concentration": "Digital Media Communications"
+  },
+  {
+    "category": "Art & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 21,
+    "concentration": "English"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 22,
+    "concentration": "Fashion & Interior Design"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 112,
+    "concentration": "Foreign Language"
+  },
+  {
+    "category": "Art & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 305,
+    "concentration": "Gender Studies"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 20,
+    "concentration": "Graphic Design"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 311,
+    "concentration": "History"
+  },
+  {
+    "category": "Art & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 23,
+    "concentration": "Humanities"
+  },
+  {
+    "category": "Art & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 24,
+    "concentration": "Liberal Arts"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 315,
+    "concentration": "Journalism"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 25,
+    "concentration": "Music"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 335,
+    "concentration": "Political Science"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 349,
+    "concentration": "Technical Writing"
+  },
+  {
+    "category": "Arts & Liberal Arts",
+    "category_id": 8,
+    "concentration_id": 27,
+    "concentration": "Writing"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 281,
+    "concentration": "Accounting"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 90,
+    "concentration": "Business Administration"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 383,
+    "concentration": "Business Analytics"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 29,
+    "concentration": "Business Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 30,
+    "concentration": "Communications"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 290,
+    "concentration": "Construction Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 33,
+    "concentration": "Digital Marketing"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 41,
+    "concentration": "Entrepreneuship"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 28,
+    "concentration": "Finance"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 357,
+    "concentration": "General Business"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 104,
+    "concentration": "Hospitality Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 35,
+    "concentration": "Human Resources"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 36,
+    "concentration": "International Business"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 31,
+    "concentration": "Management Information Systems"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 37,
+    "concentration": "Marketing"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 328,
+    "concentration": "Nonprofit Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 38,
+    "concentration": "Supply Chain Operations Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 32,
+    "concentration": "Organizational Leadership"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 39,
+    "concentration": "Project Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 337,
+    "concentration": "Public Administration"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 40,
+    "concentration": "Real Estate"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 42,
+    "concentration": "Sports Management"
+  },
+  {
+    "category": "Business",
+    "category_id": 9,
+    "concentration_id": 105,
+    "concentration": "Technology Management"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 55,
+    "concentration": "Computer Information Systems"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 56,
+    "concentration": "Information Technology"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 58,
+    "concentration": "IT Management"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 289,
+    "concentration": "Computer Science"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 53,
+    "concentration": "Database Administration"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 387,
+    "concentration": "Data Science"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 54,
+    "concentration": "Game Design"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 308,
+    "concentration": "GIS"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 52,
+    "concentration": "Information Security"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 354,
+    "concentration": "Network Administration"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 275,
+    "concentration": "Software Development"
+  },
+  {
+    "category": "Computer Science & IT",
+    "category_id": 11,
+    "concentration_id": 57,
+    "concentration": "Web Design & Development"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 379,
+    "concentration": "Administration"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 84,
+    "concentration": "Criminal Justice"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 293,
+    "concentration": "Cybersecurity"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 296,
+    "concentration": "Emergency Management"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 301,
+    "concentration": "Fire Science"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 303,
+    "concentration": "Forensic Science"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 87,
+    "concentration": "Homeland Security"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 85,
+    "concentration": "Law"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 380,
+    "concentration": "Law Enforcement"
+  },
+  {
+    "category": "Criminal Justice, Safety & Law",
+    "category_id": 16,
+    "concentration_id": 332,
+    "concentration": "Paralegal"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 364,
+    "concentration": "Adult Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 292,
+    "concentration": "Curriculum & Instruction"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 61,
+    "concentration": "Early Childhood Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 63,
+    "concentration": "Education Administration"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 385,
+    "concentration": "Educational Psychology"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 60,
+    "concentration": "Elementary Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 300,
+    "concentration": "ESL"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 365,
+    "concentration": "Family & Consumer Science"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 65,
+    "concentration": "General Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 62,
+    "concentration": "Gifted & Special Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 59,
+    "concentration": "Higher Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 64,
+    "concentration": "Instructional Design"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 318,
+    "concentration": "Library Science"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 334,
+    "concentration": "Physical Education & Coaching"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 338,
+    "concentration": "Reading & Literacy"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 340,
+    "concentration": "School Counseling"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 341,
+    "concentration": "Secondary Education (6-12)"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 363,
+    "concentration": "STEAM Education"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 366,
+    "concentration": "Teacher Leadership"
+  },
+  {
+    "category": "Education",
+    "category_id": 12,
+    "concentration_id": 348,
+    "concentration": "Teaching"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 283,
+    "concentration": "Aerospace Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 374,
+    "concentration": "Biomedical Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 372,
+    "concentration": "Chemical Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 287,
+    "concentration": "Civil Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 298,
+    "concentration": "Computer Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 295,
+    "concentration": "Electrical Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 297,
+    "concentration": "Engineering Management"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 299,
+    "concentration": "Environmental Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 306,
+    "concentration": "General Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 313,
+    "concentration": "Industrial Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 375,
+    "concentration": "Manufacturing Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 323,
+    "concentration": "Mechanical Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 373,
+    "concentration": "Nuclear Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 344,
+    "concentration": "Software Engineering"
+  },
+  {
+    "category": "Engineering",
+    "category_id": 280,
+    "concentration_id": 347,
+    "concentration": "Systems Engineering"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 73,
+    "concentration": "Dental Hygiene"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 361,
+    "concentration": "General Healthcare"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 307,
+    "concentration": "Gerontology"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 360,
+    "concentration": "Health & Wellness"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 309,
+    "concentration": "Health Informatics"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 310,
+    "concentration": "Health Science"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 71,
+    "concentration": "Healthcare Administration"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 358,
+    "concentration": "Kinesiology"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 72,
+    "concentration": "Medical Billing & Coding"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 331,
+    "concentration": "Nutrition"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 367,
+    "concentration": "Occupational Health & Safety"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 75,
+    "concentration": "Pharmacy"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 77,
+    "concentration": "Public Health"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 78,
+    "concentration": "Radiology"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 74,
+    "concentration": "Rehabilitation Therapies"
+  },
+  {
+    "category": "Healthcare",
+    "category_id": 14,
+    "concentration_id": 359,
+    "concentration": "Speech Language Pathology"
+  },
+  {
+    "category": "High School Diploma",
+    "category_id": 376,
+    "concentration_id": 377,
+    "concentration": "General"
+  },
+  {
+    "category": "High School Diploma",
+    "category_id": 376,
+    "concentration_id": 378,
+    "concentration": "Specialized"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 284,
+    "concentration": "Agriculture"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 371,
+    "concentration": "Animal Science"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 368,
+    "concentration": "Aviation"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 369,
+    "concentration": "Biology"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 370,
+    "concentration": "Biotechnology"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 81,
+    "concentration": "Environmental Science"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 304,
+    "concentration": "Forestry"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 108,
+    "concentration": "Geography"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 322,
+    "concentration": "Mathematics"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 83,
+    "concentration": "Science"
+  },
+  {
+    "category": "Math & Science",
+    "category_id": 15,
+    "concentration_id": 346,
+    "concentration": "Sustainability"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 390,
+    "concentration": "Adult Gerontology (Nurse Practitioner)"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 69,
+    "concentration": "General Nursing"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 389,
+    "concentration": "Mental Health (Nurse Practitioner)"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 326,
+    "concentration": "MSN"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 392,
+    "concentration": "Neonatal & Pediatrics"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 329,
+    "concentration": "Nurse Educator"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 388,
+    "concentration": "Nursing Informatics"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 330,
+    "concentration": "Nurse Practitioner"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 68,
+    "concentration": "Nursing Administration"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": "67",
+    "concentration": "RN to BSN"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 355,
+    "concentration": "RN to MSN"
+  },
+  {
+    "category": "Nursing",
+    "category_id": 13,
+    "concentration_id": 391,
+    "concentration": "Women's Health"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 386,
+    "concentration": "Behavioral Science"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 291,
+    "concentration": "Counseling"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 302,
+    "concentration": "Forensic Psychology"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 312,
+    "concentration": "Human Services"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 314,
+    "concentration": "Industrial Organizational Psychology"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 321,
+    "concentration": "Marriage & Family Therapy"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 336,
+    "concentration": "Psychology"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 342,
+    "concentration": "Social Work"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 343,
+    "concentration": "Sociology"
+  },
+  {
+    "category": "Psychology & Human Services",
+    "category_id": 278,
+    "concentration_id": 345,
+    "concentration": "Substance Abuse Counseling"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 382,
+    "concentration": "Biblical Studies"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 294,
+    "concentration": "Divinity"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 317,
+    "concentration": "Leadership & Ministry"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 333,
+    "concentration": "Pastoral Counseling"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 381,
+    "concentration": "Philosophy"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 339,
+    "concentration": "Religion"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 350,
+    "concentration": "Theology"
+  },
+  {
+    "category": "Religion & Philosophy",
+    "category_id": 279,
+    "concentration_id": 327,
+    "concentration": "Worship & Music Ministry"
+  }
+]

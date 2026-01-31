@@ -1,0 +1,206 @@
+{
+  "agents": [
+    {
+      "name": "perdiav5-supabase-database-agent",
+      "description": "Project-specific Supabase database management agent for Perdia v5 Content Production System",
+      "triggers": {
+        "keywords": [
+          "database",
+          "supabase",
+          "postgres",
+          "postgresql",
+          "sql",
+          "table",
+          "schema",
+          "migration",
+          "rls",
+          "row level security",
+          "query",
+          "index",
+          "foreign key",
+          "constraint",
+          "trigger",
+          "create table",
+          "add column",
+          "modify schema",
+          "alter table",
+          "optimize query",
+          "add index",
+          "improve performance",
+          "add policy",
+          "update rls",
+          "migrate",
+          "seed",
+          "slow query",
+          "performance issue",
+          "timeout",
+          "permission denied",
+          "rls error",
+          "403 error",
+          "connection error",
+          "database error",
+          "query failed"
+        ],
+        "patterns": [
+          ".*\\b(table|schema|database|supabase|postgres|migration|rls|query|index)\\b.*",
+          ".*\\b(optimize|performance|slow)\\b.*database.*",
+          ".*\\bcreate\\s+(table|index|policy)\\b.*"
+        ],
+        "automatic": true
+      },
+      "capabilities": [
+        "schema_management",
+        "rls_policy_management",
+        "migration_creation",
+        "react_query_integration",
+        "performance_optimization",
+        "documentation_maintenance",
+        "proactive_suggestions"
+      ],
+      "mcp_integration": {
+        "server": "supabase",
+        "auto_use": true,
+        "commands": [
+          "list_tables",
+          "execute_sql",
+          "apply_migration",
+          "list_migrations",
+          "get_advisors"
+        ]
+      },
+      "project_specific": {
+        "project": "Perdia v5",
+        "tables": 14,
+        "client_location": "src/services/supabaseClient.js",
+        "hooks_location": "src/hooks/",
+        "migration_location": "supabase/migrations/",
+        "patterns": "React Query hooks, Centralized Supabase client"
+      },
+      "documentation": {
+        "main": ".claude/docs/agents/perdiav5-supabase-database-agent.md",
+        "reference": "CLAUDE.md"
+      },
+      "priority": "high",
+      "auto_invoke": true
+    },
+    {
+      "name": "perdiav5-deployment-validator",
+      "description": "Deployment validation and testing agent for Perdia v5 Content Production System",
+      "triggers": {
+        "keywords": [
+          "deploy",
+          "deployment",
+          "build",
+          "release",
+          "production",
+          "staging",
+          "netlify",
+          "vercel",
+          "hosting",
+          "ci/cd",
+          "broken",
+          "down",
+          "failing",
+          "not working",
+          "500 error",
+          "site error",
+          "build failed",
+          "deploy failed"
+        ],
+        "patterns": [
+          ".*\\b(deploy|deployment|build|release|production)\\b.*",
+          ".*\\b(broken|failing|down|not working)\\b.*",
+          ".*\\bsite\\s+(error|issue|problem)\\b.*"
+        ],
+        "automatic": true
+      },
+      "capabilities": [
+        "pre_deployment_validation",
+        "build_monitoring",
+        "environment_verification",
+        "health_checks",
+        "ai_pipeline_testing",
+        "error_diagnosis",
+        "rollback_management"
+      ],
+      "project_specific": {
+        "project": "Perdia v5",
+        "build_command": "npm run build",
+        "publish_directory": "dist",
+        "framework": "React 19 + Vite",
+        "ai_services": ["Grok", "Claude"]
+      },
+      "documentation": {
+        "main": ".claude/agents/perdiav5-deployment-validator.md",
+        "reference": "CLAUDE.md"
+      },
+      "priority": "high",
+      "auto_invoke": true
+    },
+    {
+      "name": "perdiav5-generation-pipeline-agent",
+      "description": "AI content generation pipeline specialist for Perdia v5",
+      "triggers": {
+        "keywords": [
+          "generation",
+          "generate",
+          "grok",
+          "claude",
+          "humanize",
+          "humanization",
+          "draft",
+          "ai content",
+          "pipeline",
+          "two-pass",
+          "quality score",
+          "contributor",
+          "internal linking",
+          "banned phrases",
+          "anti-ai",
+          "perplexity",
+          "burstiness"
+        ],
+        "patterns": [
+          ".*\\b(generate|generation|pipeline)\\b.*",
+          ".*\\b(grok|claude)\\b.*api.*",
+          ".*\\b(humanize|humanization)\\b.*",
+          ".*\\bquality\\s+(score|metrics|issues)\\b.*"
+        ],
+        "automatic": true
+      },
+      "capabilities": [
+        "grok_client_management",
+        "claude_client_management",
+        "pipeline_orchestration",
+        "quality_scoring",
+        "contributor_assignment",
+        "internal_linking",
+        "prompt_optimization"
+      ],
+      "project_specific": {
+        "project": "Perdia v5",
+        "grok_client": "src/services/ai/grokClient.js",
+        "claude_client": "src/services/ai/claudeClient.js",
+        "generation_service": "src/services/generationService.js",
+        "pipeline_stages": [
+          "Grok Draft",
+          "Contributor Assignment",
+          "Claude Humanization",
+          "Internal Linking",
+          "Quality Scoring"
+        ]
+      },
+      "documentation": {
+        "reference": "CLAUDE.md"
+      },
+      "priority": "high",
+      "auto_invoke": true
+    }
+  ],
+  "settings": {
+    "auto_activation": true,
+    "keyword_sensitivity": "medium",
+    "multi_agent_support": true,
+    "documentation_priority": "project_specific"
+  }
+}

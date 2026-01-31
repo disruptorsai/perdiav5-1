@@ -239,7 +239,7 @@ function calculateMetrics(article) {
 /**
  * Identify issues based on metrics
  */
-function identifyIssues(metrics, article) {
+function identifyIssues(metrics) {
   const issues = []
 
   if (metrics.wordCount < 1500) {

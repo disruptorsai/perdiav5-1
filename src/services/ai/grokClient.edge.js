@@ -40,6 +40,10 @@ class GrokClient {
     const {
       contentType = 'guide',
       targetWordCount = 2000,
+      costDataContext = null,
+      authorProfile = null,
+      authorName = null,
+      contentRulesContext = null,
     } = options
 
     try {
@@ -47,6 +51,10 @@ class GrokClient {
         idea,
         contentType,
         targetWordCount,
+        costDataContext,
+        authorProfile,
+        authorName,
+        contentRulesContext,
       })
 
       return result
@@ -89,6 +97,45 @@ class GrokClient {
 
     } catch (error) {
       console.error('Grok metadata generation error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Generate content with web context (searches internet for current trends)
+   * Grok has built-in web search capabilities through xAI
+   */
+  async generateWithWebContext(prompt, options = {}) {
+    try {
+      const result = await this.callEdgeFunction('generateWithWebContext', {
+        prompt,
+        temperature: options.temperature || 0.8,
+        max_tokens: options.max_tokens || 4000,
+      })
+
+      return result
+
+    } catch (error) {
+      console.error('Grok web context generation error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Simple text generation (no JSON parsing)
+   */
+  async generate(prompt, options = {}) {
+    try {
+      const result = await this.callEdgeFunction('generate', {
+        prompt,
+        temperature: options.temperature || 0.8,
+        max_tokens: options.max_tokens || 4000,
+      })
+
+      return result
+
+    } catch (error) {
+      console.error('Grok generation error:', error)
       throw error
     }
   }

@@ -40,3 +40,16 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Constrain logo images in prose/article content */
+.prose img[src*="logo"],
+.prose img[src*="school"],
+.prose img[class*="logo"],
+.prose img.school-logo,
+.prose img.university-logo {
+  max-width: 200px !important;
+  max-height: 100px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain;
+}

@@ -28,6 +28,7 @@ Edge Functions need access to your API keys, but they should be stored as secret
 # Set AI API keys
 supabase secrets set GROK_API_KEY=your-grok-api-key-here
 supabase secrets set CLAUDE_API_KEY=your-claude-api-key-here
+supabase secrets set STEALTHGPT_API_KEY=your-stealthgpt-api-key-here
 
 # Set DataForSEO credentials (optional)
 supabase secrets set DATAFORSEO_USERNAME=your-dataforseo-username
@@ -44,6 +45,7 @@ Deploy each function individually:
 # Deploy modular AI API functions (CRITICAL - security fix)
 supabase functions deploy grok-api
 supabase functions deploy claude-api
+supabase functions deploy stealthgpt-humanize
 
 # Deploy full pipeline function
 supabase functions deploy generate-article
@@ -63,16 +65,17 @@ supabase functions deploy
 
 1. **grok-api** - Modular Grok API client for individual operations (generateDraft, generateIdeas, generateMetadata)
 2. **claude-api** - Modular Claude API client for individual operations (humanize, autoFixQualityIssues, reviseWithFeedback, extractLearningPatterns, addInternalLinks)
-3. **generate-article** - Full two-pass pipeline (Grok → Claude) for complete article generation
-4. **publish-to-wordpress** - WordPress publishing via REST API
-5. **generate-ideas-from-keywords** - DataForSEO + Grok for idea generation
+3. **stealthgpt-humanize** - StealthGPT API proxy for content humanization (bypasses CORS, secures API key)
+4. **generate-article** - Full two-pass pipeline (Grok → Claude) for complete article generation
+5. **publish-to-wordpress** - WordPress publishing via REST API
+6. **generate-ideas-from-keywords** - DataForSEO + Grok for idea generation
 
 ## Verify Deployment
 
 After deployment, verify the functions are working:
 
 1. Go to Supabase Dashboard → Edge Functions
-2. You should see all 5 functions listed (grok-api, claude-api, generate-article, publish-to-wordpress, generate-ideas-from-keywords)
+2. You should see all 7 functions listed (grok-api, claude-api, stealthgpt-humanize, generate-article, publish-to-wordpress, generate-ideas-from-keywords, auto-publish-scheduler)
 3. Click on each to see deployment logs
 
 ## Testing Edge Functions
@@ -120,6 +123,26 @@ Or for generating ideas:
     "targetPerplexity": "high",
     "targetBurstiness": "high"
   }
+}
+```
+
+### Test stealthgpt-humanize:
+```json
+{
+  "prompt": "<p>Your AI-generated content to humanize...</p>",
+  "tone": "College",
+  "mode": "High",
+  "business": true,
+  "detector": "gptzero"
+}
+```
+
+Response format:
+```json
+{
+  "success": true,
+  "result": "<p>Humanized content...</p>",
+  "howLikelyToBeDetected": 15
 }
 ```
 
@@ -188,6 +211,7 @@ View logs in real-time:
 # Monitor specific functions
 supabase functions logs grok-api --tail
 supabase functions logs claude-api --tail
+supabase functions logs stealthgpt-humanize --tail
 supabase functions logs generate-article --tail
 ```
 

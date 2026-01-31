@@ -34,13 +34,37 @@ class ClaudeClient {
   }
 
   /**
+   * Generic chat method for custom prompts
+   * @param {Array} messages - Array of message objects with role and content
+   * @param {Object} options - Options like temperature, max_tokens
+   */
+  async chat(messages, options = {}) {
+    try {
+      const result = await this.callEdgeFunction('chat', {
+        messages,
+        temperature: options.temperature || 0.7,
+        max_tokens: options.max_tokens || 4000,
+      })
+
+      return result
+
+    } catch (error) {
+      console.error('Claude chat error:', error)
+      throw error
+    }
+  }
+
+  /**
    * Humanize AI-generated content to make it undetectable
+   * Now accepts tone/voice settings from content rules configuration
    */
   async humanize(content, options = {}) {
     const {
       contributorProfile = null,
       targetPerplexity = 'high',
       targetBurstiness = 'high',
+      authorSystemPrompt = null,
+      toneVoice = null, // Tone/voice settings from content rules
     } = options
 
     try {
@@ -49,6 +73,8 @@ class ClaudeClient {
         contributorProfile,
         targetPerplexity,
         targetBurstiness,
+        authorSystemPrompt,
+        toneVoice, // Pass tone/voice to edge function for dynamic style application
       })
 
       return result
@@ -80,12 +106,16 @@ class ClaudeClient {
 
   /**
    * Revise content based on editorial feedback
+   * FIX #2: Now accepts availableInternalLinks to prevent AI suggesting bad links
    */
-  async reviseWithFeedback(content, feedbackItems) {
+  async reviseWithFeedback(content, feedbackItems, options = {}) {
+    const { availableInternalLinks = [] } = options
+    
     try {
       const result = await this.callEdgeFunction('reviseWithFeedback', {
         content,
         feedbackItems,
+        availableInternalLinks,
       })
 
       return result
@@ -98,16 +128,30 @@ class ClaudeClient {
 
   /**
    * Extract learning patterns from feedback for AI training
+   * Supports both content revision and idea feedback analysis
    */
-  async extractLearningPatterns(originalContent, revisedContent, feedbackItems) {
+  async extractLearningPatterns(params) {
     try {
-      const result = await this.callEdgeFunction('extractLearningPatterns', {
-        originalContent,
-        revisedContent,
-        feedbackItems,
-      })
+      // Determine the type of analysis based on parameters
+      const isIdeaFeedback = params.approvedIdeas || params.rejectedIdeas
 
-      return result
+      if (isIdeaFeedback) {
+        // Analyze idea feedback patterns for idea generator training
+        const result = await this.callEdgeFunction('analyzeIdeaFeedback', {
+          approvedIdeas: params.approvedIdeas || [],
+          rejectedIdeas: params.rejectedIdeas || [],
+          customNotes: params.customNotes || '',
+        })
+        return result
+      } else {
+        // Original content revision pattern extraction
+        const result = await this.callEdgeFunction('extractLearningPatterns', {
+          originalContent: params.originalContent || params,
+          revisedContent: params.revisedContent,
+          feedbackItems: params.feedbackItems,
+        })
+        return result
+      }
 
     } catch (error) {
       console.error('Claude pattern extraction error:', error)

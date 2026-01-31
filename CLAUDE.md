@@ -2,9 +2,61 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## BB1 Project Context
+
+**Linked Project:** `C:\Users\Disruptors\Documents\Tech Integration Labs BB1\Projects\Perdiav5\`
+
+When searching for context, requirements, client info, or project documentation that isn't in this repo, check the linked BB1 project folder above. Key files there include:
+- `CLAUDE.md` - Project management context
+- `_context/` - Requirements, decisions, meeting notes
+- `_project-management/` - Status, timeline, budget
+
 ## Project Overview
 
-Perdia v5 is an AI-powered content production system built with React 19, Vite, and Supabase. The application orchestrates a two-pass AI generation pipeline (Grok for drafting → Claude for humanization) to produce SEO-optimized articles with automated quality assurance, contributor assignment, and WordPress publishing capabilities.
+Perdia v5 is an AI-powered content production system built with React 19, Vite, and Supabase. The application orchestrates a two-pass AI generation pipeline (Grok for drafting → StealthGPT for humanization) to produce SEO-optimized articles with automated quality assurance, contributor assignment, and WordPress publishing capabilities.
+
+**Primary Client:** GetEducated.com
+**Stakeholders:** Tony Huffman, Kayleigh Gilbert, Sara, Charity
+
+## CRITICAL CLIENT REQUIREMENTS
+
+**See `docs/v5-updates/` for detailed specifications.** Key rules:
+
+### Approved Authors (MUST ENFORCE)
+
+**CRITICAL:** Public bylines use REAL NAMES, not aliases. The style proxy names are for internal AI voice matching only.
+
+| Real Name (PUBLIC BYLINE) | Style Proxy (INTERNAL ONLY) | Contributor Page |
+|---------------------------|----------------------------|------------------|
+| **Tony Huffman** | Kif | [Yes](https://www.geteducated.com/article-contributors/tony-huffman) |
+| **Kayleigh Gilbert** | Alicia | Pending creation |
+| **Sara** | Danny | Pending creation |
+| **Charity** | Julia | Pending creation |
+
+**NEVER publish these as bylines:**
+- Julia Tell, Kif Richmann, Alicia Carrasco, Daniel Catena (these are style aliases)
+- Admin, GetEducated, Editorial Team
+- Any legacy contributors
+
+**Author-to-Content Mapping:**
+- **Tony Huffman** → Rankings, data analysis, affordability, Best Buy lists
+- **Kayleigh Gilbert** → Professional programs, healthcare/social work, best-of guides
+- **Sara** → Technical education, degree overviews, career pathways
+- **Charity** → Teaching degrees, education careers, degree comparisons
+
+See `docs/v5-updates/08-AUTHOR-STYLE-SPECIFICATION.md` for detailed style profiles.
+
+### Content Rules
+- Cost data MUST come from GetEducated ranking reports only
+- Links to schools MUST use GetEducated school pages (never .edu)
+- External links ONLY to BLS/government/nonprofit sites
+- NEVER link to competitors (onlineu.com, usnews.com, etc.)
+- All monetization MUST use shortcodes (no raw affiliate URLs)
+
+### Workflow
+- Human review required initially
+- Auto-publish after 5 days if unreviewed (configurable)
+- Start at ~3 articles/day, scale to ~100/week when stable
 
 ## Development Commands
 
@@ -30,6 +82,7 @@ npm run lint
 The application requires environment variables in `.env.local`:
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for database access
 - `VITE_GROK_API_KEY` and `VITE_CLAUDE_API_KEY` for AI generation
+- `VITE_STEALTHGPT_API_KEY` for content humanization (AI detection bypass)
 - `VITE_DATAFORSEO_USERNAME` and `VITE_DATAFORSEO_PASSWORD` for keyword research (optional)
 
 Copy `.env.example` to `.env.local` and fill in credentials before development.
@@ -59,10 +112,12 @@ The generation pipeline is the heart of the application, orchestrated by `src/se
    - Scores contributors based on expertise areas, content types, and topic relevance
    - Uses semantic matching against contributor profiles stored in `article_contributors` table
 
-3. **Stage 3 - Humanization (Claude)**: Anti-AI-detection rewriting via `claudeClient.js`
-   - Applies contributor voice/writing style
-   - Optimizes for perplexity and burstiness metrics
-   - Removes banned phrases and AI-detection patterns
+3. **Stage 3 - Humanization (StealthGPT)**: Anti-AI-detection rewriting via `stealthGptClient.js`
+   - Processes content through StealthGPT API to bypass AI detection tools
+   - Configurable tone (Standard, HighSchool, College, PhD)
+   - Configurable bypass mode (Low, Medium, High)
+   - Optimized for specific detectors (GPTZero, Turnitin)
+   - Falls back to Claude humanization if StealthGPT is unavailable
 
 4. **Stage 4 - Internal Linking**: Intelligent link insertion
    - Fetches relevant articles from `site_articles` catalog (1000+ articles)
@@ -86,17 +141,31 @@ The generation pipeline is the heart of the application, orchestrated by `src/se
 - Real-time subscriptions for live updates
 
 **Key Tables:**
-- `articles` - Main content storage with status workflow (idea → drafting → refinement → qa_review → ready_to_publish → published)
+- `articles` - Main content storage with status workflow (idea → drafting → refinement → qa_review → ready_to_publish → published). Includes `risk_level`, `autopublish_deadline`, `reviewed_at` fields.
 - `content_ideas` - Article ideas with approval workflow (pending → approved → rejected → completed)
-- `article_contributors` - 9 specialized AI personas with expertise areas, content types, writing styles
-- `site_articles` - Internal linking catalog with link tracking
+- `article_contributors` - 4 approved authors (Tony/Kif, Kayleigh/Alicia, Sara/Daniel, Charity/Julia) with writing style profiles
+- `geteducated_articles` - GetEducated site catalog for internal linking (1000+ articles)
+- `monetization_categories` - 155 category/concentration pairs for shortcode generation
+- `monetization_levels` - 13 degree levels (Associate, Bachelor, Master, etc.)
+- `subjects` - Subject-CIP code mapping for topic classification
+- `ranking_reports`, `ranking_report_entries` - Cost data from GetEducated rankings
 - `generation_queue` - Automatic mode task queue
 
 **TanStack React Query** (`src/lib/queryClient.js`):
 - Centralized query client configuration with 5-minute staleTime and 30-minute cacheTime
 - Handles caching, refetching, and optimistic updates
-- Custom hooks in `src/hooks/` wrap common queries (useArticles, useContentIdeas, useGeneration)
+- Custom hooks in `src/hooks/` wrap common queries
 - Mutations automatically invalidate relevant queries for cache consistency
+
+**Key Hooks** (`src/hooks/`):
+- `useArticles.js`, `useContentIdeas.js` - Core content CRUD
+- `useContributors.js` - Author management (enforces 4 approved authors)
+- `useGeneration.js` - AI generation pipeline triggers
+- `usePublish.js`, `useAutoPublish.js` - Publishing workflow
+- `usePrePublishValidation.js` - Validation before publish
+- `useMonetization.js`, `useShortcodes.js` - Monetization system
+- `useGetEducatedCatalog.js` - Site article catalog for internal linking
+- `useAIRevisions.js` - AI revision history tracking
 
 ### State Management Pattern
 
@@ -129,11 +198,11 @@ No global state manager (Redux/Zustand) - state is managed through:
 
 ### AI Client Architecture
 
-Both `grokClient.js` and `claudeClient.js` follow a similar pattern:
+All AI clients (`grokClient.js`, `claudeClient.js`, `stealthGptClient.js`) follow a similar pattern:
 - Initialize API client in constructor (apiKey defaults to environment variables)
 - Expose high-level methods (`generateDraft`, `humanize`, `autoFixQualityIssues`)
 - Handle prompt engineering internally via dedicated prompt builder methods
-- Return structured data objects (Grok returns parsed JSON, Claude returns text)
+- Return structured data objects (Grok returns parsed JSON, Claude/StealthGPT return text)
 
 **Grok Client** (`grokClient.js`):
 - Uses xAI's Grok API (model: `grok-beta`)
@@ -141,11 +210,23 @@ Both `grokClient.js` and `claudeClient.js` follow a similar pattern:
 - Primary methods: `generateDraft()`, `generateIdeas()`, `generateMetadata()`
 - Direct fetch-based HTTP client implementation
 
+**StealthGPT Client** (`stealthGptClient.js`):
+- Uses StealthGPT API (https://stealthgpt.ai/api/stealthify)
+- Primary humanization provider for AI detection bypass
+- Primary methods: `humanize()`, `humanizeLongContent()`, `generate()`
+- Configurable options:
+  - `tone`: Standard, HighSchool, College (default), PhD
+  - `mode`: Low, Medium, High (default) - bypass aggressiveness
+  - `detector`: gptzero (default), turnitin - optimize for specific detector
+- Handles long content by splitting on H2/H3 headings for chunked processing
+- Falls back to Claude if API key not configured or request fails
+
 **Claude Client** (`claudeClient.js`):
-- Uses Anthropic SDK (model: `claude-3-5-sonnet-20250122`)
+- Uses Anthropic SDK (model: `claude-sonnet-4-20250514`)
 - Returns raw text content
 - Primary methods: `humanize()`, `autoFixQualityIssues()`, `reviseWithFeedback()`, `extractLearningPatterns()`
 - High temperature (0.9) for humanization, lower (0.7) for fixing/revision
+- Acts as fallback humanizer when StealthGPT is unavailable
 
 When modifying AI prompts:
 - Keep context windows in mind (max_tokens: 4000-4500)
@@ -153,14 +234,43 @@ When modifying AI prompts:
 - Validate output structure matches expected schema (especially Grok's JSON responses)
 - Be aware of the "banned phrases" list in Claude's humanization prompt
 
+### Additional Services
+
+Beyond AI clients, the `src/services/` directory contains:
+
+**Validation (`src/services/validation/`):**
+- `linkValidator.js` - Blocks .edu links, competitor URLs, validates external whitelist
+- `riskAssessment.js` - Calculates risk levels (LOW/MEDIUM/HIGH/CRITICAL)
+- `prePublishValidation.js` - Pre-publish checks (author, links, risk, quality)
+
+**Publishing & Workflow:**
+- `publishService.js` - Webhook publishing to n8n (temporary) → WordPress API (future)
+- `autoPublishService.js` - Auto-publish logic for unreviewed articles
+- `articleRevisionService.js` - Article version tracking and AI revision history
+
+**Data Services:**
+- `monetizationEngine.js` - Topic-to-monetization matching
+- `shortcodeService.js` - Shortcode generation and validation
+- `costDataService.js` - Ranking report cost data access
+- `ideaDiscoveryService.js` - Content idea generation
+
 ### Database Migrations
 
-Supabase migrations are in `supabase/migrations/`:
-1. `20250101000000_initial_schema.sql` - Creates all 14 tables
-2. `20250101000001_seed_contributors.sql` - Seeds 9 AI contributor personas
-3. `20250101000002_seed_settings.sql` - Seeds system configuration
+Supabase migrations are in `supabase/migrations/`. Run migrations in order via Supabase SQL Editor when setting up new environments.
 
-Run migrations in order via Supabase SQL Editor when setting up new environments.
+**Core migrations:**
+- `20250101000000_initial_schema.sql` - Base tables (articles, content_ideas, contributors, etc.)
+- `20250101000001_seed_contributors.sql` - Seeds contributor personas
+- `20250101000002_seed_settings.sql` - System configuration
+
+**GetEducated-specific migrations:**
+- `20250103000000_add_monetization_tables.sql` - Monetization categories and levels
+- `20250103000002_update_contributors_geteducated.sql` - Updates contributors to 4 approved authors
+- `20250105000000_create_subjects_table.sql` - Subject-CIP code mapping
+- `20250105000001_create_ranking_reports_tables.sql` - Cost data storage
+- `20250107000000_geteducated_site_catalog.sql` - GetEducated articles catalog
+- `20250108000000_article_versions_system.sql` - Version tracking
+- `20250108000001_enhance_contributor_profiles.sql` - Author profiles with style data
 
 ### Quality Metrics Implementation
 
@@ -371,13 +481,110 @@ Quality score starts at 100 and deducts points:
 
 Minimum score is clamped to 0.
 
-## Known Limitations
+## Known Limitations & Current Status
 
-1. **No automatic mode implementation yet** - Queue processing and autonomous operation not implemented
-2. **No WordPress publishing** - API integration pending (Edge Function defined but not implemented)
-3. **No drag-and-drop Kanban** - Status updates via dropdowns only
-4. **Basic rich text editor** - React Quill integration incomplete
-5. **No mobile optimization** - Desktop-first design
-6. **Client-side API keys** - Security risk, needs Edge Functions migration
+**Implemented:**
+- Link validation (blocks .edu, competitors)
+- Risk assessment and auto-publish deadline system
+- Pre-publish validation framework
+- Approved authors enforcement
+- Monetization categories/levels tables
+- GetEducated site catalog (`geteducated_articles` table)
+- Subject-CIP mapping
 
-Refer to README.md "Next Steps" section for planned improvements.
+**Partially Implemented:**
+- Internal linking (needs catalog population)
+- Auto-publish scheduler (Edge Function exists, needs cron setup)
+- Webhook publishing to n8n (service exists)
+
+**Not Yet Implemented:**
+- Direct WordPress REST API publishing
+- Shortcode auto-generation from topic matching
+- Cost data RAG for AI prompts
+- Ranking report crawler
+
+**Known Issues:**
+- TipTap editor used for rich text editing (React 19 compatible, replaced ReactQuill)
+- Client-side API keys - security risk, needs Edge Functions migration
+- Desktop-first design - no mobile optimization
+
+See `docs/v5-updates/07-REMAINING-IMPLEMENTATION.md` for detailed gap analysis.
+
+## V5 Updates Documentation
+
+All GetEducated-specific requirements and implementation details are in `docs/v5-updates/`:
+
+- `01-REQUIREMENTS-OVERVIEW.md` - Full requirements from client meetings
+- `02-CLIENT-CONTENT-RULES.md` - Kayleigh's content rules and linking policies
+- `03-MONETIZATION-SPECIFICATION.md` - Shortcode system and monetization logic
+- `04-IMPLEMENTATION-TODO.md` - Prioritized implementation task list
+- `05-MISSING-INFORMATION.md` - Documents still needed from client
+- `06-AUTHOR-STYLE-GUIDE.md` - Legacy style guide (superseded by 08)
+- `07-REMAINING-IMPLEMENTATION.md` - Gap analysis (~41% complete, detailed status)
+- `08-AUTHOR-STYLE-SPECIFICATION.md` - **CANONICAL** author spec with style proxies and content mapping
+- `09-ARTICLE-STYLE-EXTRACTS.md` - Full article excerpts for AI voice training
+- `10-MEETING-NOTES-2025-12-18.md` - Technical meeting notes with Justin/Tony
+- `12-SITEMAP-CRAWLING-SPECIFICATION.md` - **CRITICAL** Daily sitemap sync requirements
+- `13-WORDPRESS-INTEGRATION-SPECIFICATION.md` - WordPress CPT and meta key mapping
+- `14-SPONSORED-SCHOOLS-SPECIFICATION.md` - Monetization prioritization logic
+- `15-SHORTCODE-SYSTEM-SPECIFICATION.md` - Full shortcode documentation
+- `16-AI-REASONING-OUTPUT-SPECIFICATION.md` - Debug/transparency logging
+
+## CRITICAL: December 2025 Technical Requirements
+
+These requirements were confirmed in the Dec 18, 2025 meeting with Justin (developer) and Tony (owner):
+
+### Site Catalog - MUST Include /online-degrees/
+
+The current catalog is MISSING the most important section. **CRITICAL FIX REQUIRED:**
+- Crawl `https://www.geteducated.com/sitemap.xml` daily
+- Include ALL pages under `/online-degrees/` (school directory)
+- Use sitemap as **source of truth** for URL whitelisting
+- Prefer content with recent `lastmod` dates
+
+### Sponsored Schools Detection
+
+Only create content for MONETIZABLE topics:
+- Check for logo presence (logo = sponsored)
+- Check `school_priority >= 5` (paid client)
+- Cross-reference with paid clients spreadsheet
+- WARN if generating content for non-monetizable areas
+
+### WordPress Article Contributor System
+
+**DO NOT** use standard WordPress `post_author`. Use custom meta keys:
+```
+written_by: [WordPress CPT ID]  -- Article Contributor CPT ID
+edited_by: [CPT ID]             -- Optional editor
+expert_review_by: [CPT ID]      -- Optional expert reviewer
+```
+
+Get contributor CPT IDs from Justin before publishing.
+
+### Shortcode Requirements
+
+**NEVER output raw affiliate URLs.** Always use shortcodes:
+- `[ge_cta category="X" concentration="Y" level="Z"]` - Monetization
+- `[ge_internal_link url="/path"]Text[/ge_internal_link]` - Internal links
+- `[ge_external_cited url="https://..." source="BLS"]Text[/ge_external_cited]` - External
+
+Stage site docs: `https://stage.geteducated.com/shortcodes` (auth: ge2022 / !educated)
+
+### Publishing Throttling
+
+Maximum rate: 5 articles per minute with 12-second delay between publishes.
+
+### AI Reasoning Output
+
+Include reasoning/thinking output for debugging:
+- Why contributor was selected
+- Why monetization category was chosen
+- Why internal links were selected
+- Warnings for data freshness issues
+
+## Key URLs for GetEducated Integration
+
+- Ranking Reports: https://www.geteducated.com/online-college-ratings-and-rankings/
+- Degree Database: https://www.geteducated.com/online-degrees/
+- School Database: https://www.geteducated.com/online-schools/
+- Monetization Sheet: https://docs.google.com/spreadsheets/d/1s2A1Nt5OBkCeFG0vPswkh7q7Y1QDogoqlQPQPEAtRTw/

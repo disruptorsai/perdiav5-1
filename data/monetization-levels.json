@@ -1,0 +1,54 @@
+[
+  {
+    "level_name": "Associate",
+    "level_code": 1
+  },
+  {
+    "level_name": "Bachelor",
+    "level_code": 2
+  },
+  {
+    "level_name": "Bachelor Completion",
+    "level_code": 3
+  },
+  {
+    "level_name": "Certifiate",
+    "level_code": 6
+  },
+  {
+    "level_name": "Course",
+    "level_code": 399
+  },
+  {
+    "level_name": "Diploma",
+    "level_code": 7
+  },
+  {
+    "level_name": "Doctorate",
+    "level_code": 5
+  },
+  {
+    "level_name": "Graduate Certificate",
+    "level_code": 356
+  },
+  {
+    "level_name": "Graduate Course",
+    "level_code": 400
+  },
+  {
+    "level_name": "Master",
+    "level_code": 4
+  },
+  {
+    "level_name": "Post Graduate Certificate",
+    "level_code": 362
+  },
+  {
+    "level_name": "Professional Certificate",
+    "level_code": 393
+  },
+  {
+    "level_name": "Undergraduate Course",
+    "level_code": 401
+  }
+]

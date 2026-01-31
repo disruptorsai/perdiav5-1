@@ -57,6 +57,9 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: 'https://perdiav5.netlify.app/',
+        },
       })
       if (error) throw error
       return data

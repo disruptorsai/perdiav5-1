@@ -1,9 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
+import GrokClient from '../services/ai/grokClient'
+
+// Initialize Grok client for title suggestions
+const grokClient = new GrokClient()
 
 /**
- * Fetch all content ideas for the current user
+ * Fetch all content ideas (shared workspace - all users see all ideas)
  */
 export function useContentIdeas(filters = {}) {
   const { user } = useAuth()
@@ -14,7 +18,6 @@ export function useContentIdeas(filters = {}) {
       let query = supabase
         .from('content_ideas')
         .select('*, clusters(*)')
-        .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
 
       // Apply filters
@@ -32,6 +35,8 @@ export function useContentIdeas(filters = {}) {
       return data
     },
     enabled: !!user,
+    refetchOnMount: 'always', // Always refetch when navigating back to ensure fresh data
+    staleTime: 0, // Consider data immediately stale for navigation
   })
 }
 
@@ -149,6 +154,128 @@ export function useGenerateIdeasFromKeywords() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['content_ideas'] })
+    },
+  })
+}
+
+/**
+ * Quick feedback on idea (thumbs up/down)
+ * Updates feedback_score: +1 for thumbs up, -1 for thumbs down
+ */
+export function useIdeaFeedback() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ ideaId, isPositive }) => {
+      // First get current score
+      const { data: current, error: fetchError } = await supabase
+        .from('content_ideas')
+        .select('feedback_score')
+        .eq('id', ideaId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      const newScore = (current.feedback_score || 0) + (isPositive ? 1 : -1)
+
+      const { data, error } = await supabase
+        .from('content_ideas')
+        .update({
+          feedback_score: newScore,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', ideaId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content_ideas'] })
+    },
+  })
+}
+
+/**
+ * Reject idea with detailed reason (for AI training)
+ */
+export function useRejectIdeaWithReason() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ ideaId, rejectionCategory, rejectionReason, feedbackNotes }) => {
+      const { data, error } = await supabase
+        .from('content_ideas')
+        .update({
+          status: 'rejected',
+          rejection_category: rejectionCategory,
+          rejection_reason: rejectionReason,
+          feedback_notes: feedbackNotes,
+          feedback_score: -1, // Rejection counts as negative feedback
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', ideaId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content_ideas'] })
+    },
+  })
+}
+
+/**
+ * Approve idea with optional positive notes
+ */
+export function useApproveIdeaWithFeedback() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ ideaId, feedbackNotes }) => {
+      const { data, error } = await supabase
+        .from('content_ideas')
+        .update({
+          status: 'approved',
+          feedback_notes: feedbackNotes,
+          feedback_score: 1, // Approval counts as positive feedback
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', ideaId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content_ideas'] })
+    },
+  })
+}
+
+/**
+ * Generate title suggestions using Grok AI
+ * Returns 3 title suggestions with reasoning for each
+ */
+export function useGenerateTitleSuggestions() {
+  return useMutation({
+    mutationFn: async ({ description, topics, count = 3 }) => {
+      const suggestions = await grokClient.generateTitleSuggestions(
+        description,
+        topics,
+        count
+      )
+      return suggestions
     },
   })
 }

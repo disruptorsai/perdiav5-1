@@ -12,7 +12,7 @@ class ClaudeClient {
       apiKey: this.apiKey,
       dangerouslyAllowBrowser: true, // Note: In production, use Edge Functions
     })
-    this.model = 'claude-3-5-sonnet-20250122'
+    this.model = 'claude-sonnet-4-20250514'
   }
 
   /**
@@ -48,54 +48,36 @@ class ClaudeClient {
 
   /**
    * Mock humanized content for testing
+   * CRITICAL: This must return the original content when API key is missing,
+   * never a generic template that doesn't match the article!
    */
   getMockHumanizedContent(messages) {
     const userMessage = messages.find(m => m.role === 'user')?.content || ''
 
-    // If it's a humanization request, return slightly modified content
-    if (userMessage.includes('ORIGINAL CONTENT')) {
-      // Extract content between markers (simplified)
-      const contentMatch = userMessage.match(/ORIGINAL CONTENT:([\s\S]*?)(?:CRITICAL|$)/)
-      if (contentMatch) {
-        // Return the same content with minor "humanization"
-        return contentMatch[1].trim()
+    // Check for various content markers used in different prompts
+    // AI Revision uses "CURRENT HTML CONTENT:", humanization uses "ORIGINAL CONTENT:"
+    const contentMarkers = [
+      /CURRENT HTML CONTENT:\s*([\s\S]*?)(?=\n\nEDITORIAL FEEDBACK|CRITICAL|$)/i,
+      /ORIGINAL CONTENT:\s*([\s\S]*?)(?=CRITICAL|===|$)/i,
+      /CURRENT CONTENT:\s*([\s\S]*?)(?=QUALITY ISSUES|EDITORIAL FEEDBACK|===|$)/i,
+    ]
+
+    for (const marker of contentMarkers) {
+      const contentMatch = userMessage.match(marker)
+      if (contentMatch && contentMatch[1]) {
+        const extractedContent = contentMatch[1].trim()
+        // Only return if we got actual content, not empty string
+        if (extractedContent.length > 100) {
+          console.warn('⚠️ Claude API key not set - returning original content unchanged for safety')
+          return extractedContent
+        }
       }
     }
 
-    // Default mock response
-    return `<h2>Introduction to the Topic</h2>
-<p>Let's dive into this fascinating subject. You know what? It's actually more interesting than most people think.</p>
-
-<p>Here's the thing—understanding this concept doesn't require a PhD. But it does take some attention to detail.</p>
-
-<h2>The Core Concepts</h2>
-<p>First things first. We need to break down the fundamentals.</p>
-
-<p>Think of it this way: every complex system starts with simple building blocks. And this is no different.</p>
-
-<h3>Key Point One</h3>
-<p>This is where things get interesting. The first major concept revolves around understanding the relationship between components.</p>
-
-<h3>Key Point Two</h3>
-<p>Now, building on that foundation, we can explore the next layer. It's all connected—each piece influences the others in subtle but important ways.</p>
-
-<h2>Practical Applications</h2>
-<p>Theory is great, but let's talk about real-world use cases. That's where the rubber meets the road.</p>
-
-<p>I've seen this applied successfully in various contexts. The results? Pretty impressive, actually.</p>
-
-<h2>Common Pitfalls to Avoid</h2>
-<p>Here's what trips people up most often:</p>
-<ul>
-<li>Overcomplicating things right from the start</li>
-<li>Ignoring the fundamentals in favor of advanced techniques</li>
-<li>Not testing assumptions along the way</li>
-</ul>
-
-<h2>Moving Forward</h2>
-<p>So where do you go from here? Start small. Build your understanding incrementally.</p>
-
-<p>The beauty of this approach is that it's forgiving. You can course-correct as you learn more.</p>`
+    // If we couldn't extract content, throw an error instead of returning wrong content
+    // This prevents the client from seeing "a snippet that doesn't look like the original"
+    console.error('❌ Claude API key not set and could not extract original content from prompt')
+    throw new Error('CLAUDE_API_KEY_NOT_SET: Cannot perform AI revision without Claude API key. Please configure VITE_CLAUDE_API_KEY in your environment.')
   }
 
   /**
@@ -139,34 +121,80 @@ class ClaudeClient {
 
   /**
    * Build prompt for humanization
+   * IMPORTANT: Includes GetEducated-specific content rules
+   * CRITICAL: display_name is the PUBLIC byline (real name), style_proxy is INTERNAL only
    */
   buildHumanizationPrompt(content, contributorProfile, perplexity, burstiness) {
     let styleInstructions = ''
 
     if (contributorProfile) {
       const style = contributorProfile.writing_style_profile || {}
+      // CRITICAL: Use display_name (real name) for public byline, NEVER use style_proxy
+      const publicByline = contributorProfile.display_name || contributorProfile.name
+      const styleProxy = contributorProfile.style_proxy || ''
+
+      // Build comprehensive style instructions from enhanced profile fields
       styleInstructions = `
-WRITER PERSONA:
-Name: ${contributorProfile.name}
-Tone: ${style.tone || 'professional'}
-Complexity: ${style.complexity_level || 'intermediate'}
-Sentence Length: ${style.sentence_length_preference || 'medium'}
+=== GETEDUCATED AUTHOR PROFILE ===
+Public Byline (REAL NAME): ${publicByline}
+Internal Style Proxy: ${styleProxy} (for voice matching only - NEVER publish this name)
+
+VOICE & TONE:
+${contributorProfile.voice_description || style.style_notes || 'Professional education content writer'}
+
+WRITING GUIDELINES:
+${contributorProfile.writing_guidelines || `
+- Tone: ${style.tone || 'professional'}
+- Complexity: ${style.complexity_level || 'intermediate'}
+- Sentence Length: ${style.sentence_length_preference || 'medium'}`}
+
+SIGNATURE PHRASES TO USE:
+${contributorProfile.signature_phrases?.map(p => `- "${p}"`).join('\n') || '- N/A'}
+
+PHRASES TO AVOID:
+${contributorProfile.phrases_to_avoid?.map(p => `- "${p}"`).join('\n') || '- N/A'}
+
+INTRO STYLE: ${contributorProfile.intro_style || 'Professional opening'}
+CONCLUSION STYLE: ${contributorProfile.conclusion_style || 'Clear summary with next steps'}
+=== END AUTHOR PROFILE ===
 `
     }
 
-    return `You are a highly skilled human writer. Your task is to rewrite the following AI-generated content to make it completely undetectable as AI-written. The content must read as if it was written by a real human with personality, expertise, and natural writing patterns.
+    return `You are a highly skilled human writer working for GetEducated.com, an online education resource. Your task is to rewrite the following AI-generated content to make it completely undetectable as AI-written while maintaining GetEducated's content standards.
 
 ${styleInstructions}
 
 ORIGINAL CONTENT:
 ${content}
 
+=== GETEDUCATED CONTENT RULES (MUST PRESERVE) ===
+
+1. LINKING RULES:
+   - All school mentions should link to GetEducated school pages (geteducated.com/online-schools/...)
+   - All degree mentions should link to GetEducated degree database (geteducated.com/online-degrees/...)
+   - NEVER create links to .edu school websites
+   - External links ONLY to BLS, government sites, nonprofit education orgs
+   - NEVER link to competitors (onlineu.com, usnews.com, etc.)
+
+2. COST DATA:
+   - Preserve all cost data exactly as written (sourced from GetEducated ranking reports)
+   - Keep "in-state" and "out-of-state" cost distinctions
+   - Maintain references to GetEducated's ranking methodology
+
+3. STRUCTURE:
+   - Keep "GetEducated's Picks" callout boxes
+   - Preserve article navigation sections
+   - Maintain FAQ sections with all questions/answers
+   - Keep "How we researched this" attribution
+
+=== END GETEDUCATED RULES ===
+
 CRITICAL HUMANIZATION TECHNIQUES:
 
 1. **Perplexity (Unpredictability)**: ${perplexity}
    - Use unexpected word choices and phrasings
    - Avoid predictable transitions
-   - Include occasional colloquialisms or industry-specific terms
+   - Include occasional education industry terms
    - Vary vocabulary richly
 
 2. **Burstiness (Sentence Variation)**: ${burstiness}
@@ -176,10 +204,10 @@ CRITICAL HUMANIZATION TECHNIQUES:
    - Vary sentence structures significantly
 
 3. **Voice & Personality**:
-   - Add subtle personal touches ("I've found that...", "In my experience...")
-   - Include minor imperfections (starting sentences with "And" or "But")
+   - Write as an education expert helping prospective students
+   - Add empathy for readers' education and career goals
+   - Include minor stylistic imperfections (starting sentences with "And" or "But")
    - Use rhetorical questions sparingly
-   - Show emotion where appropriate
 
 4. **Natural Writing Patterns**:
    - Avoid overly perfect grammar (humans make small stylistic choices)
@@ -200,13 +228,31 @@ CRITICAL HUMANIZATION TECHNIQUES:
    - "Leverage"
    - "Robust"
    - "Seamless"
+   - "Navigate the landscape"
+   - "Embark on a journey"
 
 6. **Content Quality**:
-   - Keep all factual information accurate
+   - Keep all factual information accurate (especially costs and accreditation)
    - Maintain the same structure and headings
-   - Preserve HTML formatting
+   - Preserve HTML formatting and all links
    - Keep the same SEO focus
-   - Ensure the content remains valuable and informative
+   - Ensure the content remains valuable for online education seekers
+
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
 
 OUTPUT ONLY THE REWRITTEN HTML CONTENT. DO NOT include explanations, meta-commentary, or anything other than the pure HTML article content.`
   }
@@ -246,16 +292,32 @@ QUALITY ISSUES TO FIX:
 - ${issueDescriptions}
 ${internalLinksContext}
 
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
+
 INSTRUCTIONS:
 1. Fix each issue listed above
 2. For word count: Add or remove content naturally, maintaining quality
 3. For internal links: Add 3-5 contextual links to the provided articles where genuinely relevant (use HTML <a> tags)
 4. For external links: Add 2-4 citations to authoritative sources like research papers, official documentation, or reputable publications
-5. For FAQs: Add a "Frequently Asked Questions" section with at least 3 relevant Q&A pairs at the end
+5. For FAQs: Add a "Frequently Asked Questions" section with at least 3 relevant Q&A pairs at the end using proper HTML (<h2>Frequently Asked Questions</h2> followed by <h3> for questions and <p> for answers)
 6. For readability: Simplify complex sentences, break up long paragraphs, use clearer language
 7. For headings: Ensure proper H2/H3 hierarchy, make headings descriptive and keyword-rich
 8. Maintain the article's tone, style, and factual accuracy
-9. Keep all existing HTML formatting
+9. Keep all existing HTML formatting and ensure ALL new content is properly HTML formatted
 
 OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
@@ -297,12 +359,28 @@ ${content}
 EDITORIAL FEEDBACK:
 ${feedbackText}
 
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
+
 INSTRUCTIONS:
 1. Address each piece of feedback carefully
 2. Make necessary revisions to the content
 3. Maintain the overall structure and tone
 4. Keep all other content unchanged
-5. Preserve HTML formatting
+5. Preserve HTML formatting and ensure ALL new content is properly HTML formatted
 
 OUTPUT ONLY THE REVISED HTML CONTENT.`
 
