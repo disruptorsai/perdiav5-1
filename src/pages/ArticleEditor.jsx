@@ -141,9 +141,6 @@ function ArticleEditorContent() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   const [thumbsFeedbackComment, setThumbsFeedbackComment] = useState('')
 
-  // Post-revision workflow state (per Dec 22, 2025 meeting - approve/reject UX)
-  const [pendingRevision, setPendingRevision] = useState(null) // { previousContent, revisedContent, feedbackItems, timestamp }
-
   // Update local state when article loads
   useEffect(() => {
     if (article) {
