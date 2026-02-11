@@ -268,7 +268,7 @@ function Dashboard() {
     }
   }
 
-  // Handle article approval with user initials
+  // Handle article final approval - adds to auto-publishing queue (F-07)
   const handleApproveArticle = async (article) => {
     try {
       await approveArticle.mutateAsync({
@@ -276,8 +276,8 @@ function Dashboard() {
         initials: userInitials,
       })
       addToast({
-        title: 'Article Approved',
-        description: `"${article.title}" has been approved by ${userInitials}`,
+        title: 'Final Approval Given',
+        description: `"${article.title}" approved by ${userInitials} - added to auto-publishing queue`,
         variant: 'success',
       })
     } catch (error) {
@@ -1117,11 +1117,11 @@ function SortableArticleCard({ article, onClick, onStatusChange, onApprove, inde
                       e.stopPropagation()
                       onApprove?.(article)
                     }}
-                    className="px-2 py-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors flex items-center gap-1"
-                    title="Approve for publishing"
+                    className="px-2 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1"
+                    title="Give final approval and add to auto-publishing queue"
                   >
                     <UserCheck className="w-3 h-3" />
-                    Approve
+                    Final Approval
                   </motion.button>
                 )
               )}

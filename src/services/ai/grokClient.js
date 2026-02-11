@@ -45,10 +45,13 @@ ALTERNATIVE PHRASING TO USE:
 
 class GrokClient {
   constructor(apiKey) {
-    this.apiKey = apiKey || import.meta.env.VITE_GROK_API_KEY
-    this.baseUrl = 'https://api.x.ai/v1'
-    // Use Grok 3 - grok-beta was deprecated on 2025-09-15
-    this.model = 'grok-3'
+    // Prefer OpenRouter, fall back to direct Grok API
+    this.apiKey = apiKey || import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_GROK_API_KEY
+    // Use OpenRouter if we have an OpenRouter key
+    this.useOpenRouter = !!(import.meta.env.VITE_OPENROUTER_API_KEY)
+    this.baseUrl = this.useOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.x.ai/v1'
+    // OpenRouter model name for Grok (grok-3 is the standard model as of 2026)
+    this.model = this.useOpenRouter ? 'x-ai/grok-3' : 'grok-3'
     // Increased token limit to prevent truncation
     // Long-form articles need ~2000 words = ~2500 tokens for content alone
     // Plus JSON wrapper, FAQs, metadata = ~10000 tokens total needed
@@ -89,7 +92,7 @@ class GrokClient {
   }
 
   /**
-   * Make a request to the Grok API
+   * Make a request to the Grok API (via OpenRouter or direct)
    */
   async request(messages, options = {}) {
     // Check if API key is set
@@ -100,29 +103,34 @@ class GrokClient {
 
     const {
       temperature = 0.8,
-      max_tokens = this.defaultMaxTokens, // Use class default (8000) instead of 4000
+      max_tokens = this.defaultMaxTokens,
     } = options
 
-    // Try multiple model names if the primary fails
-    const modelVariants = [
-      this.model,           // grok-2-latest
-      'grok-2',             // Alternative name
-      'grok-beta',          // Legacy name
-      'grok-2-1212',        // Versioned name
-    ]
+    // Build headers - add OpenRouter-specific headers if using OpenRouter
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+    }
+
+    if (this.useOpenRouter) {
+      headers['HTTP-Referer'] = 'https://perdiav5.netlify.app'
+      headers['X-Title'] = 'Perdia v5 Content Engine'
+    }
+
+    // Model variants to try (updated for current OpenRouter availability)
+    const modelVariants = this.useOpenRouter
+      ? ['x-ai/grok-3', 'x-ai/grok-3-mini', 'x-ai/grok-4', 'x-ai/grok-4-fast']  // OpenRouter model names
+      : [this.model, 'grok-3', 'grok-3-mini', 'grok-2']  // Direct xAI model names
 
     let lastError = null
 
     for (const modelName of modelVariants) {
       try {
-        console.log(`Trying Grok model: ${modelName}`)
+        console.log(`Trying Grok model${this.useOpenRouter ? ' via OpenRouter' : ''}: ${modelName}`)
 
         const response = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
+          headers,
           body: JSON.stringify({
             model: modelName,
             messages,
@@ -135,7 +143,6 @@ class GrokClient {
         if (response.ok) {
           const data = await response.json()
           console.log(`✓ Successfully used model: ${modelName}`)
-          // Update the model name for future requests
           this.model = modelName
           return data.choices[0].message.content
         }
@@ -155,12 +162,10 @@ class GrokClient {
           throw new Error(`Grok API error (${response.status}): ${errorMessage}`)
         }
 
-        // Store 404 error but continue trying other models
         lastError = new Error(`Model '${modelName}' not found (404)`)
         console.warn(`Model ${modelName} returned 404, trying next variant...`)
 
       } catch (error) {
-        // If it's not a 404, stop trying and throw
         if (!error.message.includes('404')) {
           throw error
         }
@@ -168,9 +173,7 @@ class GrokClient {
       }
     }
 
-    // If we get here, all models failed
     console.error('All Grok model variants failed:', modelVariants)
-    console.error('Please check https://docs.x.ai/api for the current model name')
     throw lastError || new Error('Failed to connect to Grok API with any known model name')
   }
 
@@ -308,6 +311,9 @@ Follow the author's voice, style, and guidelines precisely. This will ensure con
    * IMPORTANT: Includes GetEducated-specific content rules (now configurable from database)
    */
   buildDraftPrompt(idea, contentType, targetWordCount, costDataContext = null, authorProfile = null, authorName = null, contentRulesContext = null) {
+    // Get current year dynamically - CRITICAL for date accuracy in content
+    const currentYear = new Date().getFullYear()
+
     let costDataSection = ''
     if (costDataContext) {
       costDataSection = `\n\n${costDataContext}\n`
@@ -325,6 +331,13 @@ Follow the author's voice, style, and guidelines precisely. This will ensure con
     }
 
     return `Generate a comprehensive ${contentType} article based on this content idea for GetEducated.com, an online education resource.
+
+IMPORTANT DATE CONTEXT:
+- Today's date is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+- The current year is ${currentYear}
+- When referencing years or dates in the article, use ${currentYear} as the current year
+- For future projections, use ${currentYear + 1} onwards
+- NEVER use outdated years like 2024 or 2025 when referring to "this year" or "current"
 
 ${ANTI_HALLUCINATION_RULES}
 ${costDataSection}${authorSection}

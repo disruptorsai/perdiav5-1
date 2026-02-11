@@ -18,7 +18,7 @@
  * - Work backwards from paid school listings
  */
 
-import GrokClient from './ai/grokClient.edge'
+import GrokClient from './ai/grokClient'
 import { supabase } from './supabaseClient'
 import { categorizeUrl } from './sitemapService'
 

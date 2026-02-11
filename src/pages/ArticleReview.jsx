@@ -220,6 +220,7 @@ export default function ArticleReview() {
       setCommentData({ comment: '', category: 'style', severity: 'minor' })  // Reset to valid DB value
     } catch (error) {
       console.error('Error creating comment:', error)
+      alert('Failed to submit comment: ' + (error?.message || 'Unknown error'))
     }
   }
 
@@ -256,10 +257,13 @@ export default function ArticleReview() {
 
     try {
       // Call the AI revision - the animation will show analyzing/processing phases
+      // Pass article title and topics so the hook can fetch relevant cost data and internal links
       const result = await reviseArticle.mutateAsync({
         articleId,
         content: article.content,
-        feedbackItems
+        feedbackItems,
+        articleTitle: article.title,
+        articleTopics: article.seed_topics || []
       })
 
       // When content arrives, update state - animation will transition to "writing" phase

@@ -5,6 +5,7 @@ import { format, formatDistanceToNow, isPast, differenceInDays, differenceInHour
 import { motion } from 'framer-motion'
 import { supabase } from '@/services/supabaseClient'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAllPendingComments } from '@/hooks/useArticleComments'
 import { useAllRevisions } from '@/hooks/useArticleRevisions'
 import { useDeleteArticleWithReason } from '@/hooks/useDeletionLog'
 import { usePublishArticle } from '@/hooks/usePublish'
@@ -246,7 +247,10 @@ export default function ReviewQueue() {
     }).length
   }, [articles])
 
-  // Get all revisions for comment counts
+  // Get all pending comments for comment counts (from article_comments table)
+  const { data: allPendingComments = [] } = useAllPendingComments()
+
+  // Get all revisions for revision history tracking (from article_revisions table)
   const { data: allRevisions = [] } = useAllRevisions()
 
   // Status update mutation
@@ -322,8 +326,9 @@ export default function ReviewQueue() {
     }
   }
 
+  // Get pending comment count from the article_comments table (not article_revisions)
   const getArticleCommentCount = (articleId) => {
-    return allRevisions.filter(r => r.article_id === articleId && r.status === 'pending').length
+    return allPendingComments.filter(c => c.article_id === articleId).length
   }
 
   // Check if an article is a revision (either from is_revision field or has ai_revised revisions)

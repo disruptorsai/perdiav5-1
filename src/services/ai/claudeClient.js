@@ -1,18 +1,16 @@
 /**
  * Claude AI Client for Content Humanization
- * Uses Anthropic's Claude API for making content undetectable and auto-fixing quality issues
+ * Uses OpenRouter or Anthropic's Claude API for making content undetectable and auto-fixing quality issues
  */
-
-import Anthropic from '@anthropic-ai/sdk'
 
 class ClaudeClient {
   constructor(apiKey) {
-    this.apiKey = apiKey || import.meta.env.VITE_CLAUDE_API_KEY
-    this.client = new Anthropic({
-      apiKey: this.apiKey,
-      dangerouslyAllowBrowser: true, // Note: In production, use Edge Functions
-    })
-    this.model = 'claude-sonnet-4-20250514'
+    // Prefer OpenRouter, fall back to direct Claude API
+    this.apiKey = apiKey || import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_CLAUDE_API_KEY
+    this.useOpenRouter = !!(import.meta.env.VITE_OPENROUTER_API_KEY)
+    this.baseUrl = this.useOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.anthropic.com/v1'
+    // OpenRouter model name for Claude
+    this.model = this.useOpenRouter ? 'anthropic/claude-sonnet-4' : 'claude-sonnet-4-20250514'
   }
 
   /**
@@ -31,18 +29,81 @@ class ClaudeClient {
     } = options
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens,
-        temperature,
-        messages,
-      })
-
-      return response.content[0].text
+      const response = await this.makeRequest(messages, { temperature, max_tokens })
+      return response
 
     } catch (error) {
       console.error('Claude chat error:', error)
       throw error
+    }
+  }
+
+  /**
+   * Make a request to Claude API (via OpenRouter or direct)
+   */
+  async makeRequest(messages, options = {}) {
+    const { temperature = 0.7, max_tokens = 4000 } = options
+
+    // Build headers
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+    }
+
+    if (this.useOpenRouter) {
+      headers['HTTP-Referer'] = 'https://perdiav5.netlify.app'
+      headers['X-Title'] = 'Perdia v5 Content Engine'
+    } else {
+      // Direct Anthropic API requires different headers
+      headers['x-api-key'] = this.apiKey
+      headers['anthropic-version'] = '2023-06-01'
+      delete headers['Authorization']
+    }
+
+    const endpoint = this.useOpenRouter
+      ? `${this.baseUrl}/chat/completions`
+      : `${this.baseUrl}/messages`
+
+    // OpenRouter uses OpenAI-style format, Anthropic uses its own format
+    const body = this.useOpenRouter
+      ? {
+          model: this.model,
+          messages,
+          temperature,
+          max_tokens,
+        }
+      : {
+          model: this.model,
+          max_tokens,
+          temperature,
+          messages,
+        }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorMessage = 'Unknown error'
+      try {
+        const error = JSON.parse(errorText)
+        errorMessage = error.error?.message || error.message || errorText
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status}`
+      }
+      throw new Error(`Claude API error (${response.status}): ${errorMessage}`)
+    }
+
+    const data = await response.json()
+
+    // OpenRouter returns OpenAI-style response, Anthropic returns its own format
+    if (this.useOpenRouter) {
+      return data.choices[0].message.content
+    } else {
+      return data.content[0].text
     }
   }
 
@@ -99,19 +160,17 @@ class ClaudeClient {
     const prompt = this.buildHumanizationPrompt(content, contributorProfile, targetPerplexity, targetBurstiness)
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4500,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.9,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 4500,
       })
 
-      return response.content[0].text
+      return response
 
     } catch (error) {
       console.error('Claude humanization error:', error)
@@ -322,19 +381,17 @@ INSTRUCTIONS:
 OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4500,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.7,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 4500,
       })
 
-      return response.content[0].text
+      return response
 
     } catch (error) {
       console.error('Claude auto-fix error:', error)
@@ -344,19 +401,88 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
   /**
    * Revise content based on editorial feedback
+   * Enhanced with data context to prevent AI hallucination
+   * @param {string} content - Current article HTML content
+   * @param {Array} feedbackItems - Array of feedback objects with category, severity, selected_text, comment
+   * @param {Object} context - Optional context data (costData, internalLinks, articleTitle)
    */
-  async reviseWithFeedback(content, feedbackItems) {
+  async reviseWithFeedback(content, feedbackItems, context = {}) {
+    const currentYear = new Date().getFullYear()
     const feedbackText = feedbackItems.map((item, index) => {
       return `${index + 1}. [${item.category.toUpperCase()}] ${item.severity}: "${item.selected_text}"
    Issue: ${item.comment}`
     }).join('\n\n')
 
+    // Build data context sections based on what's provided
+    let costDataSection = ''
+    let internalLinksSection = ''
+
+    // Include cost data if provided
+    if (context.costData && context.costData.length > 0) {
+      costDataSection = `
+=== APPROVED COST DATA FROM GETEDUCATED RANKING REPORTS ===
+CRITICAL: Use ONLY these numbers. Do NOT invent or estimate costs.
+
+${context.costData.map(entry => {
+  let text = `📊 ${entry.school_name} - ${entry.program_name}\n`
+  if (entry.total_cost) text += `   Total Cost: $${entry.total_cost.toLocaleString()}\n`
+  if (entry.in_state_cost) text += `   In-State: $${entry.in_state_cost.toLocaleString()}\n`
+  if (entry.out_of_state_cost) text += `   Out-of-State: $${entry.out_of_state_cost.toLocaleString()}\n`
+  if (entry.rank_position) text += `   Rank Position: #${entry.rank_position}\n`
+  if (entry.ranking_reports?.report_url) text += `   Source: ${entry.ranking_reports.report_url}\n`
+  if (entry.geteducated_school_url) text += `   Link to: ${entry.geteducated_school_url}\n`
+  return text
+}).join('\n')}
+=== END APPROVED COST DATA ===
+`
+    }
+
+    // Include internal links if provided
+    if (context.internalLinks && context.internalLinks.length > 0) {
+      internalLinksSection = `
+=== APPROVED INTERNAL LINKS (GetEducated.com) ===
+CRITICAL: Use ONLY these URLs for internal links. Do NOT invent URLs.
+
+${context.internalLinks.map(link => `- [${link.title}](${link.url})`).join('\n')}
+
+=== END APPROVED INTERNAL LINKS ===
+`
+    }
+
     const prompt = `You are a content editor revising this article based on editorial feedback.
 
-CURRENT CONTENT:
+=== CRITICAL GUARDRAILS - MUST FOLLOW ===
+
+1. FACTUAL ACCURACY:
+   - NEVER invent tuition costs, school rankings, or program details
+   - If cost data is provided below, use ONLY those exact numbers
+   - If NO cost data is provided, use qualitative language ("affordable", "competitive") instead of specific numbers
+   - If you cannot find verified data for a claim, rewrite to avoid the claim
+
+2. INTERNAL LINKS:
+   - ONLY use URLs from the "APPROVED INTERNAL LINKS" section below
+   - If no approved links are provided, do NOT add new internal links
+   - NEVER invent GetEducated URLs - they will 404
+
+3. EXTERNAL LINKS - STRICT WHITELIST:
+   - ONLY link to these exact domains: bls.gov, ed.gov, nces.ed.gov, studentaid.gov, fafsa.gov, collegescorecard.ed.gov
+   - Also allowed: chea.org, aacsb.edu, abet.org, cacrep.org, ccne-accreditation.org, cswe.org
+   - Also allowed: collegeboard.org, acenet.edu, aacn.nche.edu, naspa.org, apa.org, nasw.org, nursingworld.org
+   - NEVER link to: .edu school sites, Wikipedia, news sites, foundations, associations not listed above
+   - NEVER link to: onlineu.com, usnews.com, bestcolleges.com, niche.com, or any competitor
+   - If you're unsure if a link is allowed, DO NOT include it - the text will suffice without a link
+
+4. DATES:
+   - Today's date is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+   - The current year is ${currentYear}
+   - ALWAYS use ${currentYear} for "current year" references
+
+=== END GUARDRAILS ===
+${costDataSection}${internalLinksSection}
+CURRENT HTML CONTENT:
 ${content}
 
-EDITORIAL FEEDBACK:
+EDITORIAL FEEDBACK TO ADDRESS:
 ${feedbackText}
 
 === CRITICAL HTML FORMATTING RULES ===
@@ -377,27 +503,27 @@ NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p
 
 INSTRUCTIONS:
 1. Address each piece of feedback carefully
-2. Make necessary revisions to the content
-3. Maintain the overall structure and tone
-4. Keep all other content unchanged
-5. Preserve HTML formatting and ensure ALL new content is properly HTML formatted
+2. If feedback asks for cost/tuition data, ONLY use numbers from APPROVED COST DATA above
+3. If feedback asks for links, ONLY use URLs from APPROVED INTERNAL LINKS above
+4. If you cannot fulfill a request with approved data, explain what you CAN do instead
+5. Maintain the overall structure and tone
+6. Keep all other content unchanged
+7. Preserve HTML formatting
 
 OUTPUT ONLY THE REVISED HTML CONTENT.`
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4500,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.7,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 4500,
       })
 
-      return response.content[0].text
+      return response
 
     } catch (error) {
       console.error('Claude revision error:', error)
@@ -438,19 +564,17 @@ FORMAT AS JSON:
 Generate the patterns now:`
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 2000,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.6,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 2000,
       })
 
-      const parsed = JSON.parse(response.content[0].text)
+      const parsed = JSON.parse(response)
       return parsed.patterns
 
     } catch (error) {

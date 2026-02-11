@@ -166,9 +166,11 @@ export function validateLink(url) {
   )
 
   if (!isAllowed) {
-    // Not on whitelist - warning but not blocking
-    result.issues.push(`External link to ${domain} is not on the approved list. Consider using BLS, government, or nonprofit sources.`)
-    result.severity = 'warning'
+    // STRICT MODE: Block ANY external link not on the whitelist
+    // Changed from warning to blocking per Feb 2026 feedback - too many dead links slipping through
+    result.isValid = false
+    result.issues.push(`External link to ${domain} is NOT on the approved whitelist. Only links to BLS.gov, government sites (.gov), and approved nonprofit/accreditation organizations are allowed. This link will be removed.`)
+    result.severity = 'blocking'
   }
 
   return result
@@ -461,6 +463,64 @@ export async function validateLinksAreLive(content, options = {}) {
   return results
 }
 
+/**
+ * STRICT LINK CLEANUP: Remove any links not on the approved whitelist
+ * This runs as a post-processing step to catch anything the AI generated incorrectly
+ * @param {string} content - HTML content
+ * @returns {Object} { cleanedContent, removedLinks, stats }
+ */
+export function stripUnapprovedLinks(content) {
+  if (!content) return { cleanedContent: content, removedLinks: [], stats: { total: 0, removed: 0 } }
+
+  const links = extractLinks(content)
+  const removedLinks = []
+  let cleanedContent = content
+
+  for (const link of links) {
+    const validation = validateLink(link.url)
+
+    // If the link is not valid (blocked), remove the <a> tag but keep the text
+    if (!validation.isValid) {
+      removedLinks.push({
+        url: link.url,
+        anchorText: link.anchorText,
+        reason: validation.issues.join('; '),
+      })
+
+      // Replace the full <a>...</a> tag with just the anchor text
+      cleanedContent = cleanedContent.replace(link.fullMatch, link.anchorText)
+    }
+  }
+
+  return {
+    cleanedContent,
+    removedLinks,
+    stats: {
+      total: links.length,
+      removed: removedLinks.length,
+      remaining: links.length - removedLinks.length,
+    },
+  }
+}
+
+/**
+ * Format the allowed external domains as a string for AI prompts
+ * @returns {string} Formatted list of allowed domains
+ */
+export function getApprovedDomainsForPrompt() {
+  return `APPROVED EXTERNAL LINK DOMAINS (ONLY these are allowed):
+- bls.gov (Bureau of Labor Statistics)
+- ed.gov, nces.ed.gov, studentaid.gov, fafsa.gov, collegescorecard.ed.gov (Government education)
+- chea.org, aacsb.edu, abet.org, cacrep.org, ccne-accreditation.org, cswe.org (Accreditation bodies)
+- collegeboard.org, acenet.edu, aacn.nche.edu, naspa.org (Nonprofit education)
+- apa.org, nasw.org, nursingworld.org (Professional associations)
+
+ANY other external domain will be STRIPPED from the content. Do NOT link to:
+- Any .edu domains (use GetEducated school pages instead)
+- Any .org, .com, .net sites not listed above
+- Wikipedia, news sites, university websites, etc.`
+}
+
 export default {
   validateLink,
   validateContent,
@@ -472,6 +532,8 @@ export default {
   canPublish,
   checkLinkStatus,
   validateLinksAreLive,
+  stripUnapprovedLinks,
+  getApprovedDomainsForPrompt,
   BLOCKED_COMPETITORS,
   ALLOWED_EXTERNAL_DOMAINS,
 }

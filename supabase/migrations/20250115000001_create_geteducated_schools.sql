@@ -2,22 +2,12 @@
 -- Purpose: Store known school names to validate against AI-generated content
 --          and prevent fabricated school names from being published
 
--- Create the schools table
-CREATE TABLE IF NOT EXISTS geteducated_schools (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
-  url TEXT NOT NULL,
-  aliases TEXT[] DEFAULT '{}',
-  -- School metadata
-  state TEXT,
-  school_type TEXT, -- public, private-nonprofit, private-for-profit
-  is_accredited BOOLEAN DEFAULT TRUE,
-  -- Tracking
-  times_mentioned INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Add missing columns to existing geteducated_schools table
+-- (The table was created in 20250107000000_geteducated_site_catalog.sql)
+ALTER TABLE geteducated_schools ADD COLUMN IF NOT EXISTS aliases TEXT[] DEFAULT '{}';
+ALTER TABLE geteducated_schools ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE geteducated_schools ADD COLUMN IF NOT EXISTS is_accredited BOOLEAN DEFAULT TRUE;
+ALTER TABLE geteducated_schools ADD COLUMN IF NOT EXISTS times_mentioned INTEGER DEFAULT 0;
 
 -- Create indexes for fast lookups
 CREATE INDEX IF NOT EXISTS idx_geteducated_schools_name
@@ -26,9 +16,17 @@ CREATE INDEX IF NOT EXISTS idx_geteducated_schools_name
 CREATE INDEX IF NOT EXISTS idx_geteducated_schools_slug
   ON geteducated_schools(slug);
 
--- Create GIN index for aliases array search
-CREATE INDEX IF NOT EXISTS idx_geteducated_schools_aliases
-  ON geteducated_schools USING GIN(aliases);
+-- Create GIN index for aliases array search (only if column exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'geteducated_schools' AND column_name = 'aliases'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_geteducated_schools_aliases
+      ON geteducated_schools USING GIN(aliases);
+  END IF;
+END $$;
 
 -- Full-text search index for fuzzy matching
 CREATE INDEX IF NOT EXISTS idx_geteducated_schools_name_fts
@@ -103,25 +101,27 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Seed initial school data from ranking_report_entries (if they exist)
-INSERT INTO geteducated_schools (name, slug, url)
-SELECT DISTINCT
-  rre.school_name,
-  LOWER(REGEXP_REPLACE(
-    REGEXP_REPLACE(rre.school_name, '[^a-zA-Z0-9\s-]', '', 'g'),
-    '\s+', '-', 'g'
-  )),
-  COALESCE(
-    rre.school_url,
-    'https://www.geteducated.com/online-schools/' ||
-    LOWER(REGEXP_REPLACE(
-      REGEXP_REPLACE(rre.school_name, '[^a-zA-Z0-9\s-]', '', 'g'),
-      '\s+', '-', 'g'
-    )) || '/'
-  )
-FROM ranking_report_entries rre
-WHERE rre.school_name IS NOT NULL
-  AND LENGTH(rre.school_name) > 3
-ON CONFLICT (slug) DO NOTHING;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'ranking_report_entries') THEN
+    INSERT INTO geteducated_schools (name, slug, url)
+    SELECT DISTINCT
+      rre.school_name,
+      LOWER(REGEXP_REPLACE(
+        REGEXP_REPLACE(rre.school_name, '[^a-zA-Z0-9\s-]', '', 'g'),
+        '\s+', '-', 'g'
+      )),
+      'https://www.geteducated.com/online-schools/' ||
+      LOWER(REGEXP_REPLACE(
+        REGEXP_REPLACE(rre.school_name, '[^a-zA-Z0-9\s-]', '', 'g'),
+        '\s+', '-', 'g'
+      )) || '/'
+    FROM ranking_report_entries rre
+    WHERE rre.school_name IS NOT NULL
+      AND LENGTH(rre.school_name) > 3
+    ON CONFLICT (slug) DO NOTHING;
+  END IF;
+END $$;
 
 -- Also seed from schools table if it exists
 DO $$
@@ -129,12 +129,12 @@ BEGIN
   IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'schools') THEN
     INSERT INTO geteducated_schools (name, slug, url)
     SELECT DISTINCT
-      s.name,
-      s.slug,
-      COALESCE(s.url, 'https://www.geteducated.com/online-schools/' || s.slug || '/')
+      s.school_name,
+      s.school_slug,
+      COALESCE(s.geteducated_url, 'https://www.geteducated.com/online-schools/' || s.school_slug || '/')
     FROM schools s
-    WHERE s.name IS NOT NULL
-      AND LENGTH(s.name) > 3
+    WHERE s.school_name IS NOT NULL
+      AND LENGTH(s.school_name) > 3
     ON CONFLICT (slug) DO NOTHING;
   END IF;
 END $$;

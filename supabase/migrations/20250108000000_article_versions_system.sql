@@ -7,7 +7,7 @@
 -- =====================================================
 -- Stores each version of an article's content
 CREATE TABLE IF NOT EXISTS geteducated_article_versions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID NOT NULL REFERENCES geteducated_articles(id) ON DELETE CASCADE,
 
   -- Version Info
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS geteducated_article_versions (
 -- =====================================================
 -- Queue for articles pending AI revision
 CREATE TABLE IF NOT EXISTS geteducated_revision_queue (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID NOT NULL REFERENCES geteducated_articles(id) ON DELETE CASCADE,
 
   -- Revision Request

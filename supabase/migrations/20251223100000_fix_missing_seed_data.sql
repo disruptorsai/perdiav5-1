@@ -514,13 +514,13 @@ ON CONFLICT (category_id, concentration_id) DO UPDATE SET
 -- ============================================================================
 
 -- Add missing critical settings
-INSERT INTO system_settings (key, value) VALUES
-  ('default_author_id', 'null'),
-  ('auto_publish_delay_days', '5'),
-  ('max_articles_per_day', '100'),
-  ('publish_rate_limit_per_minute', '5'),
-  ('publish_delay_seconds', '12')
-ON CONFLICT (key) DO NOTHING;
+INSERT INTO system_settings (setting_key, setting_value) VALUES
+  ('default_author_id', 'null'::jsonb),
+  ('auto_publish_delay_days', '5'::jsonb),
+  ('max_articles_per_day', '100'::jsonb),
+  ('publish_rate_limit_per_minute', '5'::jsonb),
+  ('publish_delay_seconds', '12'::jsonb)
+ON CONFLICT (setting_key) DO NOTHING;
 
 -- ============================================================================
 -- 5. ENSURE CONTRIBUTOR WORDPRESS IDS ARE SET

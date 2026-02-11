@@ -57,15 +57,21 @@ export function useAddToQueue() {
     mutationFn: async ({ contentIdeaId, priority = 0 }) => {
       if (!user) throw new Error('User not authenticated')
 
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
+      const insertData = {
+        content_idea_id: contentIdeaId,
+        status: 'pending',
+        priority,
+        progress_percentage: 0,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: user.id }),
+      }
+
       const { data, error } = await supabase
         .from('generation_queue')
-        .insert({
-          content_idea_id: contentIdeaId,
-          user_id: user.id,
-          status: 'pending',
-          priority,
-          progress_percentage: 0,
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -90,12 +96,16 @@ export function useBulkAddToQueue() {
     mutationFn: async (items) => {
       if (!user) throw new Error('User not authenticated')
 
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
       const queueItems = items.map((item, index) => ({
         content_idea_id: item.contentIdeaId,
-        user_id: user.id,
         status: 'pending',
         priority: item.priority || 0,
         progress_percentage: 0,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: user.id }),
       }))
 
       const { data, error } = await supabase

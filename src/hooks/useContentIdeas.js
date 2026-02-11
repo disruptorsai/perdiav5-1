@@ -42,6 +42,7 @@ export function useContentIdeas(filters = {}) {
 
 /**
  * Create a new content idea
+ * Note: In development mode (no auth), user_id is omitted to avoid foreign key errors
  */
 export function useCreateContentIdea() {
   const { user } = useAuth()
@@ -49,12 +50,18 @@ export function useCreateContentIdea() {
 
   return useMutation({
     mutationFn: async (ideaData) => {
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
+      const insertData = {
+        ...ideaData,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: user.id }),
+      }
+
       const { data, error } = await supabase
         .from('content_ideas')
-        .insert({
-          ...ideaData,
-          user_id: user.id,
-        })
+        .insert(insertData)
         .select()
         .single()
 

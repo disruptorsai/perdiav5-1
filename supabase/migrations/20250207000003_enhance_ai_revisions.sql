@@ -40,6 +40,7 @@ ORDER BY ar.created_at DESC;
 
 GRANT SELECT ON ai_training_summary TO authenticated;
 
+DROP POLICY IF EXISTS "Users can delete their revisions" ON ai_revisions;
 CREATE POLICY "Users can delete their revisions" ON ai_revisions
   FOR DELETE TO authenticated
   USING (triggered_by_user = auth.uid());

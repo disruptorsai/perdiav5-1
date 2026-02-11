@@ -73,18 +73,24 @@ export function useCreateRevision() {
         ? existingRevisions[0].version_number + 1
         : 1
 
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
+      const insertData = {
+        article_id: revisionData.article_id,
+        selected_text: revisionData.selected_text,
+        comment: revisionData.comment,
+        category: revisionData.category,
+        severity: revisionData.severity,
+        version_number: nextVersion,
+        status: 'pending',
+        // Only include created_by if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { created_by: user?.id }),
+      }
+
       const { data, error } = await supabase
         .from('article_revisions')
-        .insert({
-          article_id: revisionData.article_id,
-          selected_text: revisionData.selected_text,
-          comment: revisionData.comment,
-          category: revisionData.category,
-          severity: revisionData.severity,
-          version_number: nextVersion,
-          status: 'pending',
-          created_by: user?.id,
-        })
+        .insert(insertData)
         .select()
         .single()
 

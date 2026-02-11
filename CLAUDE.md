@@ -4,12 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## BB1 Project Context
 
-**Linked Project:** `C:\Users\Disruptors\Documents\Tech Integration Labs BB1\Projects\Perdiav5\`
+**Linked Project (Disruptors dev environment):** `C:\Users\Disruptors\Documents\Tech Integration Labs BB1\Projects\Perdiav5\`
 
-When searching for context, requirements, client info, or project documentation that isn't in this repo, check the linked BB1 project folder above. Key files there include:
-- `CLAUDE.md` - Project management context
-- `_context/` - Requirements, decisions, meeting notes
-- `_project-management/` - Status, timeline, budget
+This path contains project management context (requirements, decisions, meeting notes, timeline, budget) that may not be present in this repo. This is only relevant when working in the Disruptors development environment.
 
 ## Project Overview
 
@@ -58,24 +55,56 @@ See `docs/v5-updates/08-AUTHOR-STYLE-SPECIFICATION.md` for detailed style profil
 - Auto-publish after 5 days if unreviewed (configurable)
 - Start at ~3 articles/day, scale to ~100/week when stable
 
+## Deployment & Infrastructure
+
+| Service | ID | URL |
+|---------|-----|-----|
+| Netlify | e6c79ffe-d40e-4123-b404-ade94e4ec295 | https://perdiav5.netlify.app |
+| Supabase | nvffvcjtrgxnunncdafz | db.nvffvcjtrgxnunncdafz.supabase.co |
+| GitHub | TechIntegrationLabs/perdiav5 | - |
+
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server (default: http://localhost:5173)
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run ESLint
-npm run lint
+npm install              # Install dependencies (uses --legacy-peer-deps via .npmrc)
+npm run dev              # Start dev server (http://localhost:5173)
+npm run build            # Build for production
+npm run preview          # Preview production build
+npm run lint             # Run ESLint
 ```
+
+Note: `npm run dev` and `npm run build` automatically run `generate-git-info` as a pre-hook.
+
+### Troubleshooting
+
+If you encounter "Module not found" errors after pulling:
+```bash
+rm -rf node_modules && npm install
+```
+
+Database RLS violations typically mean the user isn't authenticated or policies need updating in Supabase.
+
+## Slash Commands
+
+Project-specific commands for common tasks (run with `/command`):
+
+| Command | Purpose |
+|---------|---------|
+| `/deploy-fix` | Fix Netlify deployment failures with closed-loop check/fix/push |
+| `/deploy-test` | Deploy and run comprehensive tests on deployed site |
+| `/quick-test` | Quick browser test - captures console errors without changes |
+| `/debug-loop` | Automated debugging: navigate, capture errors, fix, redeploy |
+| `/debug-pipeline` | Debug AI generation pipeline issues |
+| `/test-ai-clients` | Test Grok and Claude API connections |
+| `/generate-article` | Generate article using two-pass AI pipeline |
+| `/check-quality` | Analyze article quality metrics |
+| `/commit` | Commit and push all changes |
+| `/db` | Database changes via MCP and subagent |
+| `/setup-database` | Supabase database setup guide |
+| `/add-feature` | Guide for adding features following conventions |
+| `/review-architecture` | Review codebase architecture |
+| `/optimize-prompts` | Optimize AI prompts for better output |
+| `/migrate-to-edge-functions` | Guide for moving AI calls to Edge Functions |
 
 ## Environment Setup
 
@@ -305,20 +334,18 @@ State transitions should update `status` field and optionally create `article_re
 
 ## Styling and UI
 
-- **Tailwind CSS 4.1** with custom configuration
+- **Tailwind CSS 4.1** with `@tailwindcss/postcss` plugin (not v3)
 - **Class Variance Authority (CVA)** for variant-based component styling
 - **Lucide React** for icons
-- **Shadcn/ui patterns** for component architecture (not full Shadcn install, but follows similar patterns)
+- **Shadcn/ui patterns** for component architecture (not full Shadcn install)
+- Use `cn()` utility in `src/lib/utils.js` for conditional class merging (`clsx` + `tailwind-merge`)
 
-Use `clsx` and `tailwind-merge` via the `cn()` utility in `src/lib/utils.js` for conditional class merging.
+## Testing
 
-## Testing Considerations
-
-Currently no test suite exists. When adding tests:
-- Use Vitest (already compatible with Vite)
-- Test generation pipeline in isolation with mocked AI responses
-- Test quality metrics calculation with known content samples
-- Test contributor assignment algorithm with fixture data
+No test suite exists. When adding tests, use Vitest (compatible with Vite). Priority test targets:
+- Generation pipeline with mocked AI responses
+- Quality metrics calculation with known content samples
+- Contributor assignment algorithm with fixture data
 
 ## Feature Development Guidelines
 
@@ -346,109 +373,17 @@ The pipeline stages in `GenerationService.generateArticle()` are designed to be 
 
 ## Common Patterns
 
-### Data Fetching Pattern
+### Data Fetching
+Custom hooks in `src/hooks/` wrap React Query with auth context. Key patterns:
+- Include filters in `queryKey` for proper caching
+- Use `enabled: !!user` to wait for authentication
+- Mutations call `queryClient.invalidateQueries()` for cache consistency
 
-Custom hooks in `src/hooks/` wrap React Query operations and include authentication context:
+### AI Generation
+Instantiate `GenerationService` and call `generateArticle(idea, options)` where options include `contentType`, `targetWordCount`, `autoAssignContributor`, and `addInternalLinks`. Always wrap AI client calls in try/catch.
 
-```javascript
-// Query hook pattern
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../services/supabaseClient'
-import { useAuth } from '../contexts/AuthContext'
-
-export function useArticles(filters = {}) {
-  const { user } = useAuth()
-
-  return useQuery({
-    queryKey: ['articles', filters], // Include filters in key for proper caching
-    queryFn: async () => {
-      let query = supabase
-        .from('articles')
-        .select('*, article_contributors(*)') // Join related data
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-
-      // Apply dynamic filters
-      if (filters.status) query = query.eq('status', filters.status)
-
-      const { data, error } = await query
-      if (error) throw error
-      return data
-    },
-    enabled: !!user, // Only run when user is authenticated
-  })
-}
-
-// Mutation hook pattern
-export function useUpdateArticle() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ articleId, updates }) => {
-      const { data, error } = await supabase
-        .from('articles')
-        .update(updates)
-        .eq('id', articleId)
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    },
-    onSuccess: (data) => {
-      // Invalidate both list and individual item caches
-      queryClient.invalidateQueries({ queryKey: ['articles'] })
-      queryClient.invalidateQueries({ queryKey: ['article', data.id] })
-    },
-  })
-}
-```
-
-### AI Generation Pattern
-
-The `GenerationService` class orchestrates the complete pipeline. Always instantiate it before use:
-
-```javascript
-import GenerationService from '../services/generationService'
-
-// In a component or hook
-const generationService = new GenerationService()
-
-// Generate complete article from idea
-const articleData = await generationService.generateArticle(idea, {
-  contentType: 'guide',        // guide, listicle, ranking, explainer, review
-  targetWordCount: 2000,
-  autoAssignContributor: true,
-  addInternalLinks: true,
-})
-
-// Save to database
-const savedArticle = await generationService.saveArticle(
-  articleData,
-  ideaId,
-  userId
-)
-```
-
-All AI client calls should be wrapped in try/catch for error handling:
-
-```javascript
-try {
-  const result = await grokClient.generateDraft(idea, options)
-  // Process result
-} catch (error) {
-  console.error('AI generation error:', error)
-  // Handle error appropriately - show user feedback, retry, or fallback
-}
-```
-
-### Form Handling Pattern
-
-The codebase uses React Hook Form with Zod validation:
-- Define Zod schema for validation
-- Use `useForm()` with `zodResolver`
-- Handle submission with async/await
-- Show validation errors inline
+### Form Handling
+Uses React Hook Form with Zod validation via `zodResolver`.
 
 ## Important Implementation Details
 
@@ -509,6 +444,17 @@ Minimum score is clamped to 0.
 - Desktop-first design - no mobile optimization
 
 See `docs/v5-updates/07-REMAINING-IMPLEMENTATION.md` for detailed gap analysis.
+
+## Future: V8 Phoenix Rebuild
+
+A radical simplification is planned in `PERDIA-V8-PHOENIX-SPEC.md`. Key changes:
+- Reduce from 10,673 service lines to ~800
+- Simplify status flow: `idea → drafting → review → published` (4 states vs 6)
+- Kill unused features: AI learning, batch processing, version history UI, DataForSEO
+- Single shortcode format (`su_ge-picks`)
+- Same Supabase database - no migration needed
+
+**V8 Mantra:** "If it doesn't directly generate monetizable content, delete it."
 
 ## V5 Updates Documentation
 

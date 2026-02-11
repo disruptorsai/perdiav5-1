@@ -9,6 +9,7 @@
  * - Truncates overly long titles that look like descriptions
  * - Ensures title starts with uppercase
  * - Handles malformed AI-generated titles
+ * - Detects and fixes mid-sentence snippets (F-01 fix)
  *
  * @param {string} title - The raw title to clean
  * @param {string} description - Optional description for context
@@ -22,6 +23,30 @@ export function cleanTitle(title, description = '') {
   // Remove trailing period if present (titles shouldn't end with periods)
   if (cleaned.endsWith('.')) {
     cleaned = cleaned.slice(0, -1).trim()
+  }
+
+  // F-01 FIX: Detect mid-sentence snippets
+  // A mid-sentence snippet typically:
+  // 1. Starts with a lowercase letter
+  // 2. Starts with connecting words like "and", "or", "but", "the", "a", "an", "with", "for"
+  // 3. Looks incomplete (ends without forming a complete thought)
+  const midSentenceIndicators = [
+    /^(and|or|but|the|a|an|with|for|to|from|in|on|at|by|as|if|so|yet)\s+/i,
+    /^[a-z]/, // Starts with lowercase
+    /,\s*$/, // Ends with comma
+    /^\.\.\./,  // Starts with ellipsis
+    /\.\.\.$/,  // Ends with ellipsis
+  ]
+
+  const looksLikeMidSentence = midSentenceIndicators.some(pattern => pattern.test(cleaned))
+
+  if (looksLikeMidSentence && cleaned.length < 100) {
+    // Capitalize first letter to make it look like a proper title
+    cleaned = cleaned.replace(/^(and|or|but|the|a|an|with|for|to|from|in|on|at|by|as|if|so|yet)\s+/i, '')
+    cleaned = cleaned.replace(/^\.\.\./, '')
+    cleaned = cleaned.replace(/\.\.\.$/, '')
+    cleaned = cleaned.replace(/,\s*$/, '')
+    cleaned = cleaned.trim()
   }
 
   // If title is too long (> 80 chars), it might be a description

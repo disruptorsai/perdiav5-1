@@ -4,10 +4,12 @@
  * Pipeline: Grok Draft → StealthGPT Humanize → Quality Check → Auto-Fix Loop → Save
  */
 
-// Use Edge Function clients for secure server-side API calls
-// API keys are stored in Supabase secrets, not exposed to browser
-import GrokClient from './ai/grokClient.edge'
-import ClaudeClient from './ai/claudeClient.edge'
+// Anonymous user ID for development mode (matches AuthContext mock user)
+const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000'
+
+// Use OpenRouter for unified AI access (Grok + Claude via single API key)
+import GrokClient from './ai/grokClient'
+import ClaudeClient from './ai/claudeClient'
 import StealthGptClient from './ai/stealthGptClient'
 import { supabase } from './supabaseClient'
 import IdeaDiscoveryService from './ideaDiscoveryService'
@@ -24,6 +26,7 @@ import {
 import { contentValidator, validateDraft, validateForPublish, validateIdeaAlignment } from './validation/contentValidator'
 import { calculateQualityScore, getQualityThresholds, calculateQualityScoreAsync } from './qualityScoreService'
 import { detectSubjectArea, scoreArticlesForLinking } from './subjectMatcher'
+import { stripUnapprovedLinks } from './validation/linkValidator'
 
 class GenerationService {
   constructor() {
@@ -973,7 +976,15 @@ class GenerationService {
       }
     }).join('\n')
 
+    const currentYear = new Date().getFullYear()
+
     const prompt = `You are reviewing an article and need to fix the following quality issues:
+
+IMPORTANT DATE CONTEXT:
+- Today's date is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+- The current year is ${currentYear}
+- When referencing years or dates, use ${currentYear} as the current year
+- NEVER use outdated years when referring to "this year" or "current"
 
 QUALITY ISSUES TO FIX:
 ${issueDescriptions}
@@ -1719,6 +1730,7 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
 
   /**
    * Save generated article to database
+   * ENHANCED: Now strips unapproved links before saving (Feb 2026)
    */
   async saveArticle(articleData, ideaId, userId) {
     try {
@@ -1727,12 +1739,38 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
         articleData.slug = await this.generateUniqueSlug(articleData.slug)
       }
 
+      // STRICT LINK CLEANUP: Strip any links not on the approved whitelist
+      // This catches any bad links the AI might have generated
+      if (articleData.content) {
+        const linkCleanup = stripUnapprovedLinks(articleData.content)
+        if (linkCleanup.removedLinks.length > 0) {
+          console.warn(`[saveArticle] Stripped ${linkCleanup.removedLinks.length} unapproved links:`,
+            linkCleanup.removedLinks.map(l => l.url))
+          articleData.content = linkCleanup.cleanedContent
+
+          // Log the cleanup in AI reasoning if available
+          if (this.reasoning) {
+            this.logReasoningWarning(
+              'links_stripped',
+              `Removed ${linkCleanup.removedLinks.length} unapproved external links: ${linkCleanup.removedLinks.map(l => l.url).join(', ')}`,
+              'high'
+            )
+          }
+        }
+      }
+
+      // Check if we're using the anonymous user (no real auth)
+      const isAnonymousUser = userId === ANONYMOUS_USER_ID
+
+      const insertData = {
+        ...articleData,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: userId }),
+      }
+
       const { data, error } = await supabase
         .from('articles')
-        .insert({
-          ...articleData,
-          user_id: userId,
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -2080,16 +2118,22 @@ OUTPUT ONLY THE HUMANIZED HTML CONTENT.`
    * Add ideas to the processing queue
    */
   async queueIdeas(ideaIds, userId) {
+    // Check if we're using the anonymous user (no real auth)
+    const isAnonymousUser = userId === ANONYMOUS_USER_ID
+
     for (const ideaId of ideaIds) {
       // Add to generation_queue table
+      const insertData = {
+        idea_id: ideaId,
+        status: 'pending',
+        priority: 5,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: userId }),
+      }
+
       await supabase
         .from('generation_queue')
-        .insert({
-          idea_id: ideaId,
-          user_id: userId,
-          status: 'pending',
-          priority: 5,
-        })
+        .insert(insertData)
     }
   }
 
@@ -2097,16 +2141,24 @@ OUTPUT ONLY THE HUMANIZED HTML CONTENT.`
    * Process the next item in the queue
    */
   async processNextInQueue(userId, onProgress) {
+    // Check if we're using the anonymous user (no real auth)
+    const isAnonymousUser = userId === ANONYMOUS_USER_ID
+
     // Get next pending item
-    const { data: queueItem, error } = await supabase
+    let query = supabase
       .from('generation_queue')
       .select('*, content_ideas(*)')
-      .eq('user_id', userId)
       .eq('status', 'pending')
       .order('priority', { ascending: false })
       .order('created_at', { ascending: true })
       .limit(1)
-      .single()
+
+    // Only filter by user_id if it's a real authenticated user
+    if (!isAnonymousUser) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data: queueItem, error } = await query.single()
 
     if (error || !queueItem) {
       return null
@@ -2157,10 +2209,20 @@ OUTPUT ONLY THE HUMANIZED HTML CONTENT.`
    * Get existing ideas for duplicate checking
    */
   async getExistingIdeas(userId) {
-    const { data, error } = await supabase
+    // Check if we're using the anonymous user (no real auth)
+    const isAnonymousUser = userId === ANONYMOUS_USER_ID
+
+    let query = supabase
       .from('content_ideas')
       .select('title, description')
-      .eq('user_id', userId)
+
+    // Only filter by user_id if it's a real authenticated user
+    // For anonymous users, return all ideas
+    if (!isAnonymousUser) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching existing ideas:', error)
@@ -2174,19 +2236,25 @@ OUTPUT ONLY THE HUMANIZED HTML CONTENT.`
    * Save a discovered idea to the database
    */
   async saveIdea(idea, userId) {
+    // Check if we're using the anonymous user (no real auth)
+    const isAnonymousUser = userId === ANONYMOUS_USER_ID
+
+    const insertData = {
+      title: idea.title,
+      description: idea.description,
+      content_type: idea.content_type,
+      target_keywords: idea.target_keywords,
+      search_intent: idea.search_intent,
+      source: idea.source,
+      trending_reason: idea.trending_reason,
+      status: 'approved', // Auto-approve discovered ideas
+      // Only include user_id if it's a real authenticated user
+      ...(isAnonymousUser ? {} : { user_id: userId }),
+    }
+
     const { data, error } = await supabase
       .from('content_ideas')
-      .insert({
-        title: idea.title,
-        description: idea.description,
-        content_type: idea.content_type,
-        target_keywords: idea.target_keywords,
-        search_intent: idea.search_intent,
-        source: idea.source,
-        trending_reason: idea.trending_reason,
-        status: 'approved', // Auto-approve discovered ideas
-        user_id: userId,
-      })
+      .insert(insertData)
       .select()
       .single()
 

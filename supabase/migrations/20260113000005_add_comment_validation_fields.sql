@@ -71,6 +71,7 @@ WHERE status = 'pending_review';
 -- Allow any authenticated user to update article comments (shared workspace)
 -- This is needed because marking addressed can be done by any user, not just the creator
 DROP POLICY IF EXISTS "Users can update their comments" ON article_comments;
+DROP POLICY IF EXISTS "Authenticated users can update comments" ON article_comments;
 CREATE POLICY "Authenticated users can update comments" ON article_comments
   FOR UPDATE TO authenticated
   USING (TRUE)

@@ -7,7 +7,7 @@
 -- =====================================================
 -- Store author/contributor information from GetEducated
 CREATE TABLE IF NOT EXISTS geteducated_authors (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   slug TEXT UNIQUE, -- URL slug (e.g., "kayleigh-gilbert")
   title TEXT, -- "Online Education Expert"
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS geteducated_authors (
 -- =====================================================
 -- Hierarchical categories for content organization
 CREATE TABLE IF NOT EXISTS geteducated_categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE,
   parent_id UUID REFERENCES geteducated_categories(id) ON DELETE SET NULL,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS geteducated_categories (
 -- =====================================================
 -- Tags for content classification
 CREATE TABLE IF NOT EXISTS geteducated_tags (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   slug TEXT UNIQUE,
   usage_count INTEGER DEFAULT 0,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS geteducated_tags (
 -- =====================================================
 -- Comprehensive article storage for training and linking
 CREATE TABLE IF NOT EXISTS geteducated_articles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Core Content
   url TEXT NOT NULL UNIQUE,
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS geteducated_article_tags (
 -- =====================================================
 -- School/institution profiles
 CREATE TABLE IF NOT EXISTS geteducated_schools (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE,
   url TEXT UNIQUE, -- GetEducated profile URL
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS geteducated_schools (
 -- =====================================================
 -- Individual degree program listings
 CREATE TABLE IF NOT EXISTS geteducated_degree_programs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   url TEXT NOT NULL UNIQUE,
   slug TEXT,
   title TEXT NOT NULL,
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS geteducated_degree_programs (
 -- =====================================================
 -- Degree category landing pages (e.g., /online-degrees/masters/business/)
 CREATE TABLE IF NOT EXISTS geteducated_degree_categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   url TEXT NOT NULL UNIQUE,
   slug TEXT,
   title TEXT NOT NULL,
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS geteducated_degree_categories (
 -- =====================================================
 -- Curated samples for AI style training
 CREATE TABLE IF NOT EXISTS geteducated_style_samples (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID REFERENCES geteducated_articles(id) ON DELETE CASCADE,
 
   -- Sample Content

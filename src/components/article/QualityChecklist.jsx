@@ -64,9 +64,15 @@ export default function QualityChecklist({ article, content, onQualityChange, on
   const handleAutoFix = async () => {
     if (!onAutoFix) return
 
-    const issues = Object.values(checks)
-      .filter(c => !c.passed && c.issue)
-      .map(c => ({ description: c.issue, critical: c.critical }))
+    // Build issues array with type property for generationService.autoFixQualityIssues
+    const issues = Object.entries(checks)
+      .filter(([, c]) => !c.passed && c.issue)
+      .map(([key, c]) => ({
+        type: mapCheckKeyToIssueType(key),
+        description: c.issue,
+        critical: c.critical,
+        severity: c.critical ? 'major' : 'minor',
+      }))
 
     if (issues.length === 0) return
 
@@ -78,6 +84,23 @@ export default function QualityChecklist({ article, content, onQualityChange, on
     } finally {
       setIsFixing(false)
     }
+  }
+
+  // Map QualityChecklist check keys to generationService issue types
+  const mapCheckKeyToIssueType = (key) => {
+    const typeMap = {
+      wordCount: 'word_count_low', // Will be dynamically determined
+      internalLinks: 'missing_internal_links',
+      externalLinks: 'missing_external_links',
+      schema: 'missing_faqs',
+      blsCitation: 'missing_bls_citation',
+      headings: 'weak_headings',
+      images: 'missing_images',
+      imageAlt: 'missing_image_alt',
+      keywordDensity: 'keyword_density',
+      readability: 'poor_readability',
+    }
+    return typeMap[key] || key
   }
 
   const getScoreColor = () => {

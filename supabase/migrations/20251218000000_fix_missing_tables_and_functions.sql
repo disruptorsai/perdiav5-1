@@ -430,16 +430,16 @@ GRANT EXECUTE ON FUNCTION mark_feedback_as_trained(UUID[], UUID) TO authenticate
 -- 8. OPTIONAL: ADD SYSTEM SETTINGS FOR WORKFLOW
 -- ============================================================================
 
-INSERT INTO system_settings (key, value, category, description) VALUES
-  ('initial_review_required', 'true', 'workflow', 'Human review required for all content in initial phase'),
-  ('min_internal_links', '3', 'content', 'Minimum internal links required per article'),
-  ('min_external_links', '1', 'content', 'Minimum external citations required per article'),
-  ('target_word_count_min', '1500', 'content', 'Minimum target word count'),
-  ('target_word_count_max', '2500', 'content', 'Maximum target word count'),
-  ('quality_threshold', '80', 'qa', 'Minimum quality score for auto-publish consideration')
-ON CONFLICT (key) DO UPDATE SET
-  value = EXCLUDED.value,
-  category = EXCLUDED.category,
+INSERT INTO system_settings (setting_key, setting_value, setting_type, description) VALUES
+  ('initial_review_required', 'true'::jsonb, 'workflow', 'Human review required for all content in initial phase'),
+  ('min_internal_links', '3'::jsonb, 'content', 'Minimum internal links required per article'),
+  ('min_external_links', '1'::jsonb, 'content', 'Minimum external citations required per article'),
+  ('target_word_count_min', '1500'::jsonb, 'content', 'Minimum target word count'),
+  ('target_word_count_max', '2500'::jsonb, 'content', 'Maximum target word count'),
+  ('quality_threshold', '80'::jsonb, 'qa', 'Minimum quality score for auto-publish consideration')
+ON CONFLICT (setting_key) DO UPDATE SET
+  setting_value = EXCLUDED.setting_value,
+  setting_type = EXCLUDED.setting_type,
   description = EXCLUDED.description;
 
 

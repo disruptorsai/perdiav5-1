@@ -694,6 +694,12 @@ export function CommentableArticle({
       // BUG #3 FIX: Apply the content change and auto-save to database
       onContentChange?.(revisedContent)
 
+      // B-01 FIX: Update editor immediately BEFORE clearing pendingRevision
+      // This prevents the editor from reverting to old content during React's batched updates
+      if (editor) {
+        editor.commands.setContent(revisedContent, false)
+      }
+
       // Clear pending revision
       setPendingRevision(null)
 

@@ -56,17 +56,17 @@ CREATE INDEX IF NOT EXISTS idx_articles_autopublish_deadline
 CREATE INDEX IF NOT EXISTS idx_articles_risk_level ON articles(risk_level);
 
 -- Add GetEducated-specific settings to system_settings
-INSERT INTO system_settings (key, value, category, description) VALUES
-  ('approved_authors_only', 'true', 'geteducated', 'Only allow the 4 approved GetEducated authors'),
-  ('block_edu_links', 'true', 'geteducated', 'Block direct links to .edu school websites'),
-  ('block_competitor_links', 'true', 'geteducated', 'Block links to competitor sites'),
-  ('require_ranking_cost_data', 'true', 'geteducated', 'Require cost data from GetEducated ranking reports only'),
-  ('auto_publish_enabled', 'false', 'geteducated', 'Enable auto-publish after review deadline'),
-  ('auto_publish_days', '5', 'geteducated', 'Days before auto-publish if not reviewed'),
-  ('block_high_risk_publish', 'true', 'geteducated', 'Block publishing of HIGH or CRITICAL risk articles')
-ON CONFLICT (key) DO UPDATE SET
-  value = EXCLUDED.value,
-  category = EXCLUDED.category,
+INSERT INTO system_settings (setting_key, setting_value, setting_type, description) VALUES
+  ('approved_authors_only', '"true"'::jsonb, 'geteducated', 'Only allow the 4 approved GetEducated authors'),
+  ('block_edu_links', '"true"'::jsonb, 'geteducated', 'Block direct links to .edu school websites'),
+  ('block_competitor_links', '"true"'::jsonb, 'geteducated', 'Block links to competitor sites'),
+  ('require_ranking_cost_data', '"true"'::jsonb, 'geteducated', 'Require cost data from GetEducated ranking reports only'),
+  ('auto_publish_enabled', '"false"'::jsonb, 'geteducated', 'Enable auto-publish after review deadline'),
+  ('auto_publish_days', '"5"'::jsonb, 'geteducated', 'Days before auto-publish if not reviewed'),
+  ('block_high_risk_publish', '"true"'::jsonb, 'geteducated', 'Block publishing of HIGH or CRITICAL risk articles')
+ON CONFLICT (setting_key) DO UPDATE SET
+  setting_value = EXCLUDED.setting_value,
+  setting_type = EXCLUDED.setting_type,
   description = EXCLUDED.description;
 
 -- Add comment explaining the auto-publish workflow

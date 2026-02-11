@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_article_comments_severity ON article_comments(sev
 
 ALTER TABLE article_comments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view article comments" ON article_comments;
 CREATE POLICY "Users can view article comments" ON article_comments
   FOR SELECT TO authenticated
   USING (
@@ -36,6 +37,7 @@ CREATE POLICY "Users can view article comments" ON article_comments
     )
   );
 
+DROP POLICY IF EXISTS "Users can create comments" ON article_comments;
 CREATE POLICY "Users can create comments" ON article_comments
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -47,11 +49,13 @@ CREATE POLICY "Users can create comments" ON article_comments
     )
   );
 
+DROP POLICY IF EXISTS "Users can update their comments" ON article_comments;
 CREATE POLICY "Users can update their comments" ON article_comments
   FOR UPDATE TO authenticated
   USING (created_by = auth.uid())
   WITH CHECK (created_by = auth.uid());
 
+DROP POLICY IF EXISTS "Users can delete their pending comments" ON article_comments;
 CREATE POLICY "Users can delete their pending comments" ON article_comments
   FOR DELETE TO authenticated
   USING (created_by = auth.uid() AND status = 'pending');

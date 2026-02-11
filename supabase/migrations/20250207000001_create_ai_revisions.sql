@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_revisions_include_training ON ai_revisions(inc
 
 ALTER TABLE ai_revisions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their article revisions" ON ai_revisions;
 CREATE POLICY "Users can view their article revisions" ON ai_revisions
   FOR SELECT TO authenticated
   USING (
@@ -34,6 +35,7 @@ CREATE POLICY "Users can view their article revisions" ON ai_revisions
     )
   );
 
+DROP POLICY IF EXISTS "Users can create revisions for their articles" ON ai_revisions;
 CREATE POLICY "Users can create revisions for their articles" ON ai_revisions
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -45,6 +47,7 @@ CREATE POLICY "Users can create revisions for their articles" ON ai_revisions
     )
   );
 
+DROP POLICY IF EXISTS "Users can update their revisions" ON ai_revisions;
 CREATE POLICY "Users can update their revisions" ON ai_revisions
   FOR UPDATE TO authenticated
   USING (triggered_by_user = auth.uid())

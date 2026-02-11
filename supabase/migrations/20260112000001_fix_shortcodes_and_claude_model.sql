@@ -25,9 +25,9 @@ CREATE INDEX IF NOT EXISTS idx_shortcodes_is_active ON shortcodes(is_active) WHE
 -- ============================================================================
 
 UPDATE system_settings
-SET value = 'claude-sonnet-4-20250514'
-WHERE key = 'claude_model'
-  AND value = 'claude-3-5-sonnet-20250122';
+SET setting_value = '"claude-sonnet-4-20250514"'::jsonb
+WHERE setting_key = 'claude_model'
+  AND setting_value = '"claude-3-5-sonnet-20250122"'::jsonb;
 
 -- ============================================================================
 -- 3. ENSURE ai_learning_sessions EXISTS (from consolidated fix)

@@ -28,13 +28,9 @@ import {
 import { useState, useEffect } from 'react'
 
 // Import git info (generated at build time)
-// Falls back to empty object if file doesn't exist yet
-let gitInfo = { recentCommits: [], version: 'dev', buildDate: '' }
-try {
-  gitInfo = await import('../../data/git-info.json')
-} catch (e) {
-  console.warn('git-info.json not found - run npm run generate-git-info')
-}
+// Using static import to avoid top-level await issues in production
+import gitInfoData from '../../data/git-info.json'
+const gitInfo = gitInfoData || { recentCommits: [], version: 'dev', buildDate: '' }
 
 // Get icon based on commit type
 function getCommitIcon(type) {

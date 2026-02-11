@@ -102,19 +102,25 @@ export function useCreateComment() {
       selectionStart,
       selectionEnd,
     }) => {
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
+      const insertData = {
+        article_id: articleId,
+        selected_text: selectedText,
+        category,
+        severity,
+        feedback,
+        selection_start: selectionStart,
+        selection_end: selectionEnd,
+        status: 'pending',
+        // Only include created_by if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { created_by: user?.id }),
+      }
+
       const { data, error } = await supabase
         .from('article_comments')
-        .insert({
-          article_id: articleId,
-          selected_text: selectedText,
-          category,
-          severity,
-          feedback,
-          selection_start: selectionStart,
-          selection_end: selectionEnd,
-          created_by: user?.id,
-          status: 'pending',
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -257,9 +263,35 @@ export function useDismissComment() {
   })
 }
 
+/**
+ * Fetch all pending comments across all articles (for Review Queue)
+ * Returns comments grouped by article_id for efficient lookup
+ */
+export function useAllPendingComments() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: ['all-pending-comments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('article_comments')
+        .select('id, article_id, status')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(500)
+
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!user,
+    staleTime: 30000, // 30 seconds - refresh reasonably often for review queue
+  })
+}
+
 export default {
   useArticleComments,
   usePendingComments,
+  useAllPendingComments,
   useCreateComment,
   useUpdateComment,
   useDeleteComment,

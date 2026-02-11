@@ -11,10 +11,9 @@
  */
 
 import { supabase } from './supabaseClient'
-// Use Edge Function clients for secure server-side API calls
-// API keys are stored in Supabase secrets, not exposed to browser
-import GrokClient from './ai/grokClient.edge'
-import ClaudeClient from './ai/claudeClient.edge'
+// Use OpenRouter for unified AI access (Grok + Claude via single API key)
+import GrokClient from './ai/grokClient'
+import ClaudeClient from './ai/claudeClient'
 import StealthGptClient from './ai/stealthGptClient'
 
 const grokClient = new GrokClient()

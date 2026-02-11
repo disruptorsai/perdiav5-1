@@ -2,15 +2,14 @@
 -- Created: January 2025
 -- Description: Complete schema for AI-powered content production system
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable UUID extension (using pgcrypto for gen_random_uuid)
 
 -- =====================================================
 -- 1. ARTICLE CONTRIBUTORS TABLE (9 Predefined)
 -- =====================================================
 -- MUST BE CREATED FIRST - Referenced by articles table
 CREATE TABLE article_contributors (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   bio TEXT,
   avatar_url TEXT,
@@ -34,7 +33,7 @@ CREATE TABLE article_contributors (
 -- =====================================================
 -- MUST BE CREATED EARLY - Referenced by content_ideas, keywords, site_articles
 CREATE TABLE clusters (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
   parent_cluster_id UUID REFERENCES clusters(id) ON DELETE CASCADE,
@@ -50,7 +49,7 @@ CREATE TABLE clusters (
 -- 3. ARTICLES TABLE (Core Content)
 -- =====================================================
 CREATE TABLE articles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   content TEXT, -- HTML content
   excerpt TEXT,
@@ -86,7 +85,7 @@ CREATE TABLE articles (
 -- 4. CONTENT IDEAS TABLE
 -- =====================================================
 CREATE TABLE content_ideas (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
@@ -115,7 +114,7 @@ CREATE TABLE content_ideas (
 -- 5. KEYWORDS TABLE
 -- =====================================================
 CREATE TABLE keywords (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   keyword TEXT NOT NULL,
   search_volume INTEGER,
   intent TEXT CHECK (intent IN ('informational', 'navigational', 'transactional', 'commercial')),
@@ -135,7 +134,7 @@ CREATE TABLE keywords (
 -- 6. SITE ARTICLES TABLE (Internal Linking Catalog)
 -- =====================================================
 CREATE TABLE site_articles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   url TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   excerpt TEXT,
@@ -157,7 +156,7 @@ CREATE TABLE site_articles (
 -- =====================================================
 -- MUST BE CREATED BEFORE external_links to avoid issues
 CREATE TABLE internal_links (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source_article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
   target_site_article_id UUID NOT NULL REFERENCES site_articles(id) ON DELETE CASCADE,
 
@@ -173,7 +172,7 @@ CREATE TABLE internal_links (
 -- 8. EXTERNAL LINKS TABLE (Citations)
 -- =====================================================
 CREATE TABLE external_links (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
 
   -- Link Details
@@ -190,7 +189,7 @@ CREATE TABLE external_links (
 -- 9. WORDPRESS CONNECTIONS TABLE
 -- =====================================================
 CREATE TABLE wordpress_connections (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   site_url TEXT NOT NULL,
   auth_type TEXT NOT NULL CHECK (auth_type IN ('basic_auth', 'application_password', 'jwt')),
@@ -218,7 +217,7 @@ CREATE TABLE wordpress_connections (
 -- 10. ARTICLE REVISIONS TABLE (Editorial Feedback)
 -- =====================================================
 CREATE TABLE article_revisions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
   version_number INTEGER NOT NULL,
 
@@ -241,7 +240,7 @@ CREATE TABLE article_revisions (
 -- 11. TRAINING DATA TABLE (AI Learning)
 -- =====================================================
 CREATE TABLE training_data (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID REFERENCES articles(id) ON DELETE SET NULL,
 
   -- Before/After Data
@@ -266,7 +265,7 @@ CREATE TABLE training_data (
 -- 12. SHORTCODES TABLE (WordPress Shortcodes)
 -- =====================================================
 CREATE TABLE shortcodes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   code TEXT NOT NULL,
   description TEXT,
@@ -285,7 +284,7 @@ CREATE TABLE shortcodes (
 -- 13. GENERATION QUEUE TABLE (Automation)
 -- =====================================================
 CREATE TABLE generation_queue (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   content_idea_id UUID NOT NULL REFERENCES content_ideas(id) ON DELETE CASCADE,
 
   -- Queue Status
@@ -311,11 +310,12 @@ CREATE TABLE generation_queue (
 -- 14. SYSTEM SETTINGS TABLE (Configuration)
 -- =====================================================
 CREATE TABLE system_settings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  key TEXT NOT NULL UNIQUE,
-  value TEXT NOT NULL,
-  category TEXT, -- 'ai', 'seo', 'wordpress', 'automation'
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  setting_key TEXT NOT NULL UNIQUE,
+  setting_value JSONB NOT NULL,
+  setting_type TEXT, -- 'ai', 'seo', 'wordpress', 'automation', 'geteducated'
   description TEXT,
+  editable_by TEXT DEFAULT 'admin',
 
   -- Metadata
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

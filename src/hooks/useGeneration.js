@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabaseClient'
 import GenerationService from '../services/generationService'
 import { stripImagesFromHtml } from '../utils/contentUtils'
+import { searchCostData, formatCostDataForPrompt } from '../services/costDataService'
+import { stripUnapprovedLinks } from '../services/validation/linkValidator'
 
 const generationService = new GenerationService()
 
@@ -142,21 +144,85 @@ export function useAutoFixQuality() {
  * Revise article with editorial feedback
  * Enhanced with validation to ensure AI actually addressed feedback items
  * Per GetEducated issue report - addresses Issues 5 & 6 (edits not sticking, missing links)
+ *
+ * ENHANCED: Now fetches cost data and internal links to prevent AI hallucination
+ * Per feedback from Charity Derrow testing (Feb 2026)
  */
 export function useReviseArticle() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ articleId, content, feedbackItems }) => {
+    mutationFn: async ({ articleId, content, feedbackItems, articleTitle, articleTopics }) => {
       // Strip images from content before sending to AI
       // Per Bug #3: Prevents logos/images from appearing in AI-revised content
       const contentWithoutImages = stripImagesFromHtml(content)
 
-      // Use Claude to revise based on feedback
-      const revisedContent = await generationService.claude.reviseWithFeedback(
+      // Analyze feedback to determine what data we need to fetch
+      const feedbackText = feedbackItems.map(f => f.comment.toLowerCase()).join(' ')
+      const needsCostData = feedbackText.includes('cost') ||
+                           feedbackText.includes('tuition') ||
+                           feedbackText.includes('price') ||
+                           feedbackText.includes('afford') ||
+                           feedbackText.includes('$')
+      const needsLinks = feedbackText.includes('link') ||
+                        feedbackText.includes('source') ||
+                        feedbackText.includes('cite') ||
+                        feedbackText.includes('reference') ||
+                        feedbackText.includes('ranking report')
+
+      // Build context with real data from database
+      const context = {
+        costData: [],
+        internalLinks: [],
+        articleTitle: articleTitle || '',
+      }
+
+      // Fetch cost data if feedback mentions costs/tuition/prices
+      if (needsCostData) {
+        try {
+          console.log('[useReviseArticle] Fetching cost data for:', articleTitle)
+          const costData = await searchCostData(articleTitle || '', { limit: 10 })
+          context.costData = costData
+          console.log(`[useReviseArticle] Found ${costData.length} cost data entries`)
+        } catch (err) {
+          console.warn('[useReviseArticle] Could not fetch cost data:', err)
+        }
+      }
+
+      // Fetch internal links if feedback mentions links/sources
+      if (needsLinks) {
+        try {
+          console.log('[useReviseArticle] Fetching internal links for:', articleTitle)
+          const relevantArticles = await generationService.getRelevantSiteArticles(
+            articleTitle || '',
+            15,
+            { topics: articleTopics || [] }
+          )
+          context.internalLinks = relevantArticles.map(a => ({
+            title: a.title,
+            url: a.url,
+            topics: a.topics,
+          }))
+          console.log(`[useReviseArticle] Found ${context.internalLinks.length} internal links`)
+        } catch (err) {
+          console.warn('[useReviseArticle] Could not fetch internal links:', err)
+        }
+      }
+
+      // Use Claude to revise based on feedback WITH context data
+      let revisedContent = await generationService.claude.reviseWithFeedback(
         contentWithoutImages,
-        feedbackItems
+        feedbackItems,
+        context
       )
+
+      // STRICT LINK CLEANUP: Strip any unapproved external links the AI may have added
+      const linkCleanup = stripUnapprovedLinks(revisedContent)
+      if (linkCleanup.removedLinks.length > 0) {
+        console.warn(`[useReviseArticle] Stripped ${linkCleanup.removedLinks.length} unapproved links:`,
+          linkCleanup.removedLinks.map(l => `${l.url} (${l.reason})`))
+        revisedContent = linkCleanup.cleanedContent
+      }
 
       // Import validation dynamically to avoid circular dependencies
       const { validateRevision, generateValidationSummary } = await import('../utils/revisionValidator')
@@ -250,6 +316,8 @@ export function useHumanizeContent() {
  * Revise content based on feedback comments
  * Per GetEducated spec section 8.3.3 - Article Review UI Requirements
  * Bundles article text + comments as context and sends to AI for revision
+ *
+ * ENHANCED: Now fetches cost data and internal links to prevent AI hallucination
  */
 export function useReviseWithFeedback() {
   return useMutation({
@@ -263,47 +331,95 @@ export function useReviseWithFeedback() {
         .map((item, i) => `${i + 1}. ${item.comment}`)
         .join('\n')
 
-      // FIX #2: Check if any feedback is about links
+      // Check if any feedback is about links
       const feedbackLower = feedbackText.toLowerCase()
-      const isLinkRelated = feedbackLower.includes('link') || 
-                           feedbackLower.includes('source') || 
-                           feedbackLower.includes('cite') ||
-                           feedbackLower.includes('reference')
+      const needsLinks = feedbackLower.includes('link') ||
+                         feedbackLower.includes('source') ||
+                         feedbackLower.includes('cite') ||
+                         feedbackLower.includes('reference') ||
+                         feedbackLower.includes('ranking report')
+
+      // Check if any feedback is about costs/tuition
+      const needsCostData = feedbackLower.includes('cost') ||
+                            feedbackLower.includes('tuition') ||
+                            feedbackLower.includes('price') ||
+                            feedbackLower.includes('afford') ||
+                            feedbackLower.includes('$')
+
+      // Fetch cost data if feedback mentions costs/tuition
+      let costDataContext = ''
+      if (needsCostData) {
+        try {
+          console.log('[useReviseWithFeedback] Fetching cost data for:', title)
+          const costData = await searchCostData(title || '', { limit: 10 })
+          if (costData.length > 0) {
+            costDataContext = `
+=== APPROVED COST DATA FROM GETEDUCATED RANKING REPORTS ===
+CRITICAL: Use ONLY these numbers. Do NOT invent or estimate costs.
+
+${costData.map(entry => {
+  let text = `📊 ${entry.school_name} - ${entry.program_name}\n`
+  if (entry.total_cost) text += `   Total Cost: $${entry.total_cost.toLocaleString()}\n`
+  if (entry.in_state_cost) text += `   In-State: $${entry.in_state_cost.toLocaleString()}\n`
+  if (entry.out_of_state_cost) text += `   Out-of-State: $${entry.out_of_state_cost.toLocaleString()}\n`
+  if (entry.ranking_reports?.report_url) text += `   Source: ${entry.ranking_reports.report_url}\n`
+  return text
+}).join('\n')}
+=== END APPROVED COST DATA ===
+`
+            console.log(`[useReviseWithFeedback] Found ${costData.length} cost data entries`)
+          }
+        } catch (e) {
+          console.warn('[useReviseWithFeedback] Could not fetch cost data:', e)
+        }
+      }
 
       // If link-related, fetch relevant internal links
       let internalLinkContext = ''
-      if (isLinkRelated) {
+      if (needsLinks) {
         try {
           const relevantArticles = await generationService.getRelevantSiteArticles(title, 10, { topics })
           if (relevantArticles.length > 0) {
-            internalLinkContext = `\nAVAILABLE INTERNAL LINKS (use these for internal linking):\n${relevantArticles.map(a => `- [${a.title}](${a.url})`).join('\n')}\n`
+            internalLinkContext = `
+=== APPROVED INTERNAL LINKS (GetEducated.com) ===
+CRITICAL: Use ONLY these URLs for internal links. Do NOT invent URLs.
+
+${relevantArticles.map(a => `- [${a.title}](${a.url})`).join('\n')}
+
+=== END APPROVED INTERNAL LINKS ===
+`
           }
         } catch (e) {
           console.warn('[useReviseWithFeedback] Could not fetch internal links:', e)
         }
       }
 
-      // FIX #2: Always include linking rules to prevent AI suggesting bad links
+      // STRICT LINK WHITELIST - tightened Feb 2026 to prevent ANY unapproved links
       const linkingRules = `
-=== CRITICAL LINKING RULES (MUST FOLLOW) ===
+=== STRICT EXTERNAL LINK WHITELIST (ONLY these domains are allowed) ===
 
-1. NEVER link directly to school websites (.edu domains)
-   - Instead, link to GetEducated school pages: geteducated.com/online-schools/
+ALLOWED DOMAINS - Government:
+- bls.gov (Bureau of Labor Statistics)
+- ed.gov, nces.ed.gov, studentaid.gov, fafsa.gov, collegescorecard.ed.gov
 
-2. NEVER link to COMPETITOR sites:
-   - onlineu.com, usnews.com, bestcolleges.com, niche.com
-   - collegeraptor.com, affordablecollegesonline.com
-   - collegeconfidential.com, petersons.com, princetonreview.com
+ALLOWED DOMAINS - Accreditation Bodies:
+- chea.org, aacsb.edu, abet.org, cacrep.org, ccne-accreditation.org, cswe.org
 
-3. External links should ONLY go to:
-   - Bureau of Labor Statistics (bls.gov)
-   - Government sites (.gov)
-   - Nonprofit educational organizations
+ALLOWED DOMAINS - Nonprofit/Professional:
+- collegeboard.org, acenet.edu, aacn.nche.edu, naspa.org
+- apa.org, nasw.org, nursingworld.org
 
-4. If you cannot find a valid source, rewrite the sentence to not need a citation
-   - Do NOT invent URLs or use blocked sources
+NEVER LINK TO (will be automatically stripped):
+- ANY .edu school websites (use GetEducated school pages instead)
+- ANY foundation sites (nursingfoundation.org, etc.)
+- ANY association not listed above
+- Wikipedia, news sites, blogs
+- Competitors: onlineu.com, usnews.com, bestcolleges.com, niche.com, petersons.com, princetonreview.com
 
-=== END LINKING RULES ===
+CRITICAL: If unsure whether a link is allowed, DO NOT include it.
+The text can stand alone without a hyperlink. Unapproved links will be stripped.
+
+=== END LINK WHITELIST ===
 `
 
       const prompt = `You are revising an article based on editorial feedback.
@@ -312,9 +428,27 @@ ARTICLE TITLE: ${title}
 CONTENT TYPE: ${contentType || 'guide'}
 FOCUS KEYWORD: ${focusKeyword || 'N/A'}
 
+=== CRITICAL GUARDRAILS - MUST FOLLOW ===
+
+1. FACTUAL ACCURACY:
+   - NEVER invent tuition costs, school rankings, or program details
+   - If cost data is provided below, use ONLY those exact numbers
+   - If NO cost data is provided, use qualitative language ("affordable", "competitive") instead of specific numbers
+
+2. LINKS:
+   - ONLY use URLs from the "APPROVED INTERNAL LINKS" section below (if provided)
+   - NEVER invent GetEducated URLs - they will 404
+   - Follow the linking rules strictly
+
+3. DATES:
+   - The current year is ${new Date().getFullYear()}
+   - Use current year for any "current year" references
+
+=== END GUARDRAILS ===
+${costDataContext}${internalLinkContext}${linkingRules}
 EDITORIAL FEEDBACK TO ADDRESS:
 ${feedbackText}
-${linkingRules}${internalLinkContext}
+
 CURRENT ARTICLE CONTENT:
 ${contentWithoutImages}
 
@@ -327,11 +461,12 @@ INSTRUCTIONS:
 6. Ensure the article remains coherent and well-organized
 7. Keep the content length similar unless asked to expand/reduce
 8. STRICTLY follow the linking rules - never link to competitors or .edu sites
+9. If feedback asks for cost/tuition data, ONLY use numbers from APPROVED COST DATA above
 
 OUTPUT ONLY THE COMPLETE REVISED HTML CONTENT (no explanations, no commentary).`
 
       // Use Claude to revise with feedback
-      const revisedContent = await generationService.claude.chat([
+      let revisedContent = await generationService.claude.chat([
         {
           role: 'user',
           content: prompt
@@ -340,6 +475,14 @@ OUTPUT ONLY THE COMPLETE REVISED HTML CONTENT (no explanations, no commentary).`
         temperature: 0.7,
         max_tokens: 4500,
       })
+
+      // STRICT LINK CLEANUP: Strip any unapproved external links the AI may have added
+      const linkCleanup = stripUnapprovedLinks(revisedContent)
+      if (linkCleanup.removedLinks.length > 0) {
+        console.warn(`[useReviseWithFeedback] Stripped ${linkCleanup.removedLinks.length} unapproved links:`,
+          linkCleanup.removedLinks.map(l => `${l.url} (${l.reason})`))
+        revisedContent = linkCleanup.cleanedContent
+      }
 
       return { content: revisedContent }
     },
