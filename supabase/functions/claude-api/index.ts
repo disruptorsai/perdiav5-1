@@ -243,63 +243,92 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
       }
 
       case 'reviseWithFeedback': {
-        const { content, feedbackItems, availableInternalLinks = [] } = payload
+        const { content, feedbackItems, availableInternalLinks = [], costData = [], articleTitle = '' } = payload
 
         if (!content || !feedbackItems || !Array.isArray(feedbackItems)) {
           throw new Error('Missing required parameters: content and feedbackItems (array)')
         }
 
-        console.log('Revising content with feedback...')
+        console.log('Revising content with feedback (with guardrails)...')
+
+        const currentYear = new Date().getFullYear()
+        const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
         const feedbackText = feedbackItems.map((item: any, index: number) => {
           return `${index + 1}. [${item.category.toUpperCase()}] ${item.severity}: "${item.selected_text}"
    Issue: ${item.comment}`
         }).join('\n\n')
 
-        // FIX #2: Include linking rules so AI doesn't suggest bad links
-        const linkingRules = `
-=== CRITICAL LINKING RULES (MUST FOLLOW) ===
+        // Build cost data section if provided
+        let costDataSection = ''
+        if (costData && costData.length > 0) {
+          costDataSection = `
+=== APPROVED COST DATA FROM GETEDUCATED RANKING REPORTS ===
+CRITICAL: Use ONLY these numbers. Do NOT invent or estimate costs.
 
-1. NEVER link directly to school websites (.edu domains)
-   - Instead, use GetEducated school profile pages: geteducated.com/online-schools/[school-name]/
-
-2. NEVER link to these COMPETITOR sites:
-   - onlineu.com, usnews.com, bestcolleges.com, niche.com
-   - collegeraptor.com, affordablecollegesonline.com
-   - collegeconfidential.com, petersons.com, princetonreview.com
-   - gradschools.com, collegexpress.com
-
-3. External links should ONLY go to:
-   - Bureau of Labor Statistics (bls.gov)
-   - Government sites (.gov)
-   - Nonprofit educational organizations
-   - Accreditation body sites (aacsb.edu, cacrep.org, etc.)
-
-4. For internal links, use GetEducated pages:
-   - geteducated.com/online-degrees/
-   - geteducated.com/online-schools/
-   - geteducated.com/online-college-ratings-and-rankings/
-
-5. If asked to add a link and you cannot find a valid source:
-   - Rewrite the sentence to remove the need for a citation
-   - Do NOT invent URLs or use blocked sources
-
-=== END LINKING RULES ===
+${costData.map((entry: any) => {
+  let text = `- ${entry.school_name} - ${entry.program_name}\n`
+  if (entry.total_cost) text += `   Total Cost: $${Number(entry.total_cost).toLocaleString()}\n`
+  if (entry.in_state_cost) text += `   In-State: $${Number(entry.in_state_cost).toLocaleString()}\n`
+  if (entry.out_of_state_cost) text += `   Out-of-State: $${Number(entry.out_of_state_cost).toLocaleString()}\n`
+  if (entry.rank_position) text += `   Rank Position: #${entry.rank_position}\n`
+  if (entry.ranking_reports?.report_url) text += `   Source: ${entry.ranking_reports.report_url}\n`
+  if (entry.geteducated_school_url) text += `   Link to: ${entry.geteducated_school_url}\n`
+  return text
+}).join('\n')}
+=== END APPROVED COST DATA ===
 `
+        }
 
-        // If internal link suggestions were provided, include them
-        const internalLinkContext = availableInternalLinks.length > 0
-          ? `\nAVAILABLE INTERNAL LINKS (use these for internal linking requests):\n${availableInternalLinks.map((a: any) => `- [${a.title}](${a.url})`).join('\n')}\n`
-          : ''
+        // Build internal links section if provided
+        let internalLinksSection = ''
+        if (availableInternalLinks && availableInternalLinks.length > 0) {
+          internalLinksSection = `
+=== APPROVED INTERNAL LINKS (GetEducated.com) ===
+CRITICAL: Use ONLY these URLs for internal links. Do NOT invent URLs.
+
+${availableInternalLinks.map((link: any) => `- [${link.title}](${link.url})`).join('\n')}
+
+=== END APPROVED INTERNAL LINKS ===
+`
+        }
 
         const prompt = `You are a content editor revising this article based on editorial feedback.
 
-CURRENT CONTENT:
+=== CRITICAL GUARDRAILS - MUST FOLLOW ===
+
+1. FACTUAL ACCURACY:
+   - NEVER invent tuition costs, school rankings, or program details
+   - If cost data is provided below, use ONLY those exact numbers
+   - If NO cost data is provided, use qualitative language ("affordable", "competitive") instead of specific numbers
+   - If you cannot find verified data for a claim, rewrite to avoid the claim
+
+2. INTERNAL LINKS:
+   - ONLY use URLs from the "APPROVED INTERNAL LINKS" section below
+   - If no approved links are provided, do NOT add new internal links
+   - NEVER invent GetEducated URLs - they will 404
+
+3. EXTERNAL LINKS - STRICT WHITELIST:
+   - ONLY link to these exact domains: bls.gov, ed.gov, nces.ed.gov, studentaid.gov, fafsa.gov, collegescorecard.ed.gov
+   - Also allowed: chea.org, aacsb.edu, abet.org, cacrep.org, ccne-accreditation.org, cswe.org
+   - Also allowed: collegeboard.org, acenet.edu, aacn.nche.edu, naspa.org, apa.org, nasw.org, nursingworld.org
+   - NEVER link to: .edu school sites, Wikipedia, news sites, foundations, associations not listed above
+   - NEVER link to: onlineu.com, usnews.com, bestcolleges.com, niche.com, or any competitor
+   - If you're unsure if a link is allowed, DO NOT include it - the text will suffice without a link
+
+4. DATES:
+   - Today's date is ${currentDate}
+   - The current year is ${currentYear}
+   - ALWAYS use ${currentYear} for "current year" references
+
+=== END GUARDRAILS ===
+${costDataSection}${internalLinksSection}
+CURRENT HTML CONTENT:
 ${content}
 
-EDITORIAL FEEDBACK:
+EDITORIAL FEEDBACK TO ADDRESS:
 ${feedbackText}
-${linkingRules}${internalLinkContext}
+
 === CRITICAL HTML FORMATTING RULES ===
 
 Your output MUST be properly formatted HTML with:
@@ -318,11 +347,12 @@ NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p
 
 INSTRUCTIONS:
 1. Address each piece of feedback carefully
-2. Make necessary revisions to the content
-3. Maintain the overall structure and tone
-4. Keep all other content unchanged
-5. Preserve HTML formatting and ensure ALL new content is properly HTML formatted
-6. STRICTLY follow the linking rules above - never link to competitors or .edu sites
+2. If feedback asks for cost/tuition data, ONLY use numbers from APPROVED COST DATA above
+3. If feedback asks for links, ONLY use URLs from APPROVED INTERNAL LINKS above
+4. If you cannot fulfill a request with approved data, explain what you CAN do instead
+5. Maintain the overall structure and tone
+6. Keep all other content unchanged
+7. Preserve HTML formatting
 
 OUTPUT ONLY THE REVISED HTML CONTENT.`
 

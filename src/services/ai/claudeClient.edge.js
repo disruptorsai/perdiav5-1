@@ -106,16 +106,24 @@ class ClaudeClient {
 
   /**
    * Revise content based on editorial feedback
-   * FIX #2: Now accepts availableInternalLinks to prevent AI suggesting bad links
+   * Forwards guardrail context (costData, internalLinks, articleTitle) to Edge Function
    */
-  async reviseWithFeedback(content, feedbackItems, options = {}) {
-    const { availableInternalLinks = [] } = options
-    
+  async reviseWithFeedback(content, feedbackItems, context = {}) {
+    const {
+      availableInternalLinks = [],
+      costData = [],
+      internalLinks = [],
+      articleTitle = '',
+    } = context
+
     try {
       const result = await this.callEdgeFunction('reviseWithFeedback', {
         content,
         feedbackItems,
-        availableInternalLinks,
+        availableInternalLinks: availableInternalLinks.length > 0
+          ? availableInternalLinks : internalLinks,
+        costData,
+        articleTitle,
       })
 
       return result

@@ -7,9 +7,9 @@
 // Anonymous user ID for development mode (matches AuthContext mock user)
 const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000'
 
-// Use OpenRouter for unified AI access (Grok + Claude via single API key)
-import GrokClient from './ai/grokClient'
-import ClaudeClient from './ai/claudeClient'
+// Use Supabase Edge Functions for secure server-side AI access
+import GrokClient from './ai/grokClient.edge'
+import ClaudeClient from './ai/claudeClient.edge'
 import StealthGptClient from './ai/stealthGptClient'
 import { supabase } from './supabaseClient'
 import IdeaDiscoveryService from './ideaDiscoveryService'
