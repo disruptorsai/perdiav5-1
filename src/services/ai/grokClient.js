@@ -56,6 +56,37 @@ class GrokClient {
     // Long-form articles need ~2000 words = ~2500 tokens for content alone
     // Plus JSON wrapper, FAQs, metadata = ~10000 tokens total needed
     this.defaultMaxTokens = 12000
+    // Use Edge Function when no client-side API key is available
+    this.useEdgeFunction = !this.apiKey || this.apiKey === 'undefined'
+    this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    this.supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  }
+
+  /**
+   * Call the grok-api Edge Function for server-side Grok access
+   */
+  async edgeFunctionRequest(action, payload) {
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/grok-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.supabaseAnonKey}`,
+        'apikey': this.supabaseAnonKey,
+      },
+      body: JSON.stringify({ action, payload }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Edge Function error (${response.status}): ${errorText}`)
+    }
+
+    const result = await response.json()
+    if (!result.success) {
+      throw new Error(result.error || 'Edge Function returned an error')
+    }
+
+    return result.data
   }
 
   /**
@@ -95,10 +126,13 @@ class GrokClient {
    * Make a request to the Grok API (via OpenRouter or direct)
    */
   async request(messages, options = {}) {
-    // Check if API key is set
-    if (!this.apiKey || this.apiKey === 'undefined') {
-      console.warn('⚠️ Grok API key not set. Using mock data for testing.')
-      return this.getMockResponse(messages)
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generate', {
+        prompt: messages.find(m => m.role === 'user')?.content || '',
+        temperature: options.temperature || 0.8,
+        max_tokens: options.max_tokens || this.defaultMaxTokens,
+      })
     }
 
     const {
@@ -265,6 +299,19 @@ class GrokClient {
       authorName = null,
       contentRulesContext = null, // Dynamic content rules from database
     } = options
+
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateDraft', {
+        idea,
+        contentType,
+        targetWordCount,
+        costDataContext,
+        authorProfile,
+        authorName,
+        contentRulesContext,
+      })
+    }
 
     const prompt = this.buildDraftPrompt(idea, contentType, targetWordCount, costDataContext, authorProfile, authorName, contentRulesContext)
 
@@ -526,6 +573,11 @@ Generate the article now:`
    * Generate content ideas from seed topics
    */
   async generateIdeas(seedTopics, count = 10) {
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateIdeas', { seedTopics, count })
+    }
+
     const prompt = `Generate ${count} unique, specific content ideas for articles about: ${seedTopics.join(', ')}
 
 REQUIREMENTS:
@@ -580,6 +632,15 @@ Generate the ideas now:`
       temperature = 0.8,
       max_tokens = 4000,
     } = options
+
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateWithWebContext', {
+        prompt,
+        temperature,
+        max_tokens,
+      })
+    }
 
     // Grok natively supports web search through its training and real-time capabilities
     // We enhance the prompt to encourage the model to use current knowledge
@@ -689,6 +750,11 @@ Return ONLY the JSON array, no other text.`
    * Generate SEO metadata for an article
    */
   async generateMetadata(articleContent, focusKeyword) {
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateMetadata', { articleContent, focusKeyword })
+    }
+
     const prompt = `Given this article content and focus keyword, generate optimized SEO metadata.
 
 FOCUS KEYWORD: ${focusKeyword}

@@ -555,12 +555,12 @@ Generate exactly 12 ideas. EVERY idea must be monetizable - no exceptions.`
           cleanResponse = cleanResponse.trim()
         }
         const parsed = typeof cleanResponse === 'string' ? JSON.parse(cleanResponse) : cleanResponse
-        ideas = parsed.ideas || parsed || []
+        ideas = Array.isArray(parsed.ideas) ? parsed.ideas : Array.isArray(parsed) ? parsed : []
       } catch (parseError) {
         const jsonMatch = response.match(/\{[\s\S]*\}/)
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0])
-          ideas = parsed.ideas || []
+          ideas = Array.isArray(parsed.ideas) ? parsed.ideas : []
         }
       }
 
