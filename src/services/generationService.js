@@ -585,6 +585,7 @@ class GenerationService {
       // STAGE 3: Humanize with StealthGPT (primary) or Claude (fallback)
       // Uses optimized settings: 150-200 word chunks, iterative rephrasing, business mode
       let humanizedContent
+      let actualHumanizationProvider = 'none'
       if (!humanizeEnabled) {
         console.log('[Generation] Humanization step disabled in pipeline config - skipping')
         humanizedContent = draftData.content
@@ -605,6 +606,7 @@ class GenerationService {
             } else {
               humanizedContent = await this.stealthGpt.humanizeLongContent(draftData.content, stealthOptions)
             }
+            actualHumanizationProvider = 'stealthgpt'
             console.log('[Generation] Content humanized with StealthGPT (optimized)')
           } else {
             // Fallback to Claude with comprehensive author profile AND tone/voice context
@@ -615,7 +617,8 @@ class GenerationService {
               targetBurstiness: 'high',
               toneVoice: toneVoiceContext, // NEW: Pass tone/voice from content rules
             })
-            console.log('[Generation] Content humanized with Claude (fallback)')
+            actualHumanizationProvider = 'claude'
+            console.log('[Generation] Content humanized with Claude (not configured for StealthGPT)')
           }
         } catch (humanizeError) {
           console.warn('[Generation] StealthGPT humanization failed, falling back to Claude:', humanizeError.message)
@@ -626,15 +629,17 @@ class GenerationService {
             targetBurstiness: 'high',
             toneVoice: toneVoiceContext, // NEW: Pass tone/voice from content rules
           })
+          actualHumanizationProvider = 'claude (stealthgpt failed)'
         }
 
         // CRITICAL: Re-validate HTML formatting after humanization
         // StealthGPT and Claude humanization can sometimes strip HTML tags
         humanizedContent = this.ensureProperHtmlFormatting(humanizedContent)
 
-        // Log humanization decision for reasoning
+        // Log humanization decision for reasoning - track ACTUAL provider used, not just config
         this.logReasoning('humanization', {
-          provider: this.humanizationProvider === 'stealthgpt' && this.stealthGpt.isConfigured() ? 'stealthgpt' : 'claude',
+          provider: actualHumanizationProvider,
+          intended_provider: this.humanizationProvider,
           mode: this.stealthGptSettings?.mode || 'default',
           tone: this.stealthGptSettings?.tone || 'default',
           changes_made: 'Content processed for natural language patterns and AI detection bypass',
@@ -3032,6 +3037,177 @@ OUTPUT ONLY THE FIXED HTML CONTENT.`
       rules_applied_at: new Date().toISOString(),
       rules_version: this.contentRules?.version || 0,
     }
+  }
+
+  // ========================================
+  // RE-HUMANIZE EXISTING ARTICLES
+  // For articles that were saved without proper humanization
+  // (e.g., when StealthGPT had no credits and fallback silently failed)
+  // ========================================
+
+  /**
+   * Re-humanize an existing article's content
+   * Tries StealthGPT first, falls back to Claude
+   * @param {string} articleId - Article UUID
+   * @param {Object} options - { forceProvider: 'stealthgpt'|'claude', doublePassing: false }
+   * @returns {Promise<Object>} - { success, provider, content, detectionInfo }
+   */
+  async rehumanizeArticle(articleId, options = {}) {
+    const { forceProvider = null, doublePassing = false } = options
+
+    // Fetch article content
+    const { data: article, error } = await supabase
+      .from('articles')
+      .select('id, title, content, ai_reasoning')
+      .eq('id', articleId)
+      .single()
+
+    if (error || !article) {
+      throw new Error(`Article not found: ${articleId}`)
+    }
+
+    console.log(`[Rehumanize] Processing article: ${article.title} (${article.content?.length || 0} chars)`)
+
+    // Load content rules
+    const contentRules = await this.loadContentRules()
+    const toneVoiceContext = this.buildToneVoiceContext(contentRules)
+
+    let humanizedContent
+    let actualProvider = 'none'
+
+    const useStealthGpt = (forceProvider === 'stealthgpt' || (!forceProvider && this.humanizationProvider === 'stealthgpt'))
+      && this.stealthGpt.isConfigured()
+
+    if (useStealthGpt) {
+      try {
+        const stealthOptions = {
+          tone: this.stealthGptSettings.tone,
+          mode: this.stealthGptSettings.mode,
+          detector: this.stealthGptSettings.detector,
+          business: this.stealthGptSettings.business,
+        }
+
+        if (doublePassing) {
+          humanizedContent = await this.stealthGpt.humanizeWithDoublePassing(article.content, stealthOptions)
+        } else {
+          humanizedContent = await this.stealthGpt.humanizeLongContent(article.content, stealthOptions)
+        }
+        actualProvider = doublePassing ? 'stealthgpt (double-pass)' : 'stealthgpt'
+        console.log(`[Rehumanize] Content humanized with StealthGPT`)
+      } catch (stealthError) {
+        console.warn(`[Rehumanize] StealthGPT failed: ${stealthError.message}, falling back to Claude`)
+        // Fall through to Claude
+      }
+    }
+
+    // Claude fallback (or forced)
+    if (!humanizedContent) {
+      try {
+        humanizedContent = await this.claude.humanize(article.content, {
+          targetPerplexity: 'high',
+          targetBurstiness: 'high',
+          toneVoice: toneVoiceContext,
+        })
+        actualProvider = 'claude'
+        console.log(`[Rehumanize] Content humanized with Claude`)
+      } catch (claudeError) {
+        throw new Error(`Both humanization providers failed. Claude error: ${claudeError.message}`)
+      }
+    }
+
+    // Re-validate HTML formatting
+    humanizedContent = this.ensureProperHtmlFormatting(humanizedContent)
+
+    // Update article in database
+    const updatedReasoning = {
+      ...(article.ai_reasoning || {}),
+      rehumanization: {
+        provider: actualProvider,
+        rehumanized_at: new Date().toISOString(),
+        original_provider: article.ai_reasoning?.decisions?.humanization?.provider || 'unknown',
+        double_passing: doublePassing,
+      },
+    }
+
+    const { error: updateError } = await supabase
+      .from('articles')
+      .update({
+        content: humanizedContent,
+        ai_reasoning: updatedReasoning,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', articleId)
+
+    if (updateError) {
+      throw new Error(`Failed to update article: ${updateError.message}`)
+    }
+
+    console.log(`[Rehumanize] Article updated successfully with ${actualProvider}`)
+
+    return {
+      success: true,
+      provider: actualProvider,
+      articleId,
+      title: article.title,
+      originalLength: article.content?.length || 0,
+      humanizedLength: humanizedContent.length,
+    }
+  }
+
+  /**
+   * Re-humanize multiple articles in batch
+   * @param {string[]} articleIds - Array of article UUIDs (or 'all' for all qa_review articles)
+   * @param {Object} options - Same as rehumanizeArticle options
+   * @param {Function} onProgress - Progress callback
+   * @returns {Promise<Object>} - { total, succeeded, failed, results }
+   */
+  async batchRehumanize(articleIds = 'all', options = {}, onProgress = null) {
+    // If 'all', fetch all qa_review articles
+    if (articleIds === 'all') {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('id')
+        .in('status', ['qa_review', 'ready_to_publish'])
+        .order('created_at', { ascending: true })
+
+      if (error) throw new Error(`Failed to fetch articles: ${error.message}`)
+      articleIds = (data || []).map(a => a.id)
+    }
+
+    console.log(`[Rehumanize] Batch processing ${articleIds.length} articles`)
+
+    const results = []
+    let succeeded = 0
+    let failed = 0
+
+    for (let i = 0; i < articleIds.length; i++) {
+      if (onProgress) {
+        onProgress({
+          current: i + 1,
+          total: articleIds.length,
+          percent: Math.round(((i + 1) / articleIds.length) * 100),
+        })
+      }
+
+      try {
+        const result = await this.rehumanizeArticle(articleIds[i], options)
+        results.push(result)
+        succeeded++
+      } catch (error) {
+        console.error(`[Rehumanize] Failed for ${articleIds[i]}: ${error.message}`)
+        results.push({ success: false, articleId: articleIds[i], error: error.message })
+        failed++
+      }
+
+      // Rate limit between articles
+      if (i < articleIds.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`[Rehumanize] Batch complete: ${succeeded} succeeded, ${failed} failed out of ${articleIds.length}`)
+
+    return { total: articleIds.length, succeeded, failed, results }
   }
 }
 

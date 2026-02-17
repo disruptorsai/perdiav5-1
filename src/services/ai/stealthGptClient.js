@@ -356,6 +356,8 @@ class StealthGptClient {
     const humanizedChunks = []
     let totalDetectionScore = 0
     let totalIterations = 0
+    let successfulChunks = 0
+    let lastError = null
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]
@@ -366,6 +368,7 @@ class StealthGptClient {
         humanizedChunks.push(result)
         totalDetectionScore += detectionScore
         totalIterations += iterations
+        successfulChunks++
 
         // Rate limiting delay between chunks
         if (i < chunks.length - 1) {
@@ -373,13 +376,21 @@ class StealthGptClient {
         }
       } catch (error) {
         console.error(`[StealthGPT] Chunk ${i + 1} failed:`, error.message)
+        lastError = error
         // Fall back to original chunk on error
         humanizedChunks.push(chunk)
       }
     }
 
-    const avgScore = chunks.length > 0 ? Math.round(totalDetectionScore / chunks.length) : 0
-    console.log(`[StealthGPT] Complete! Avg detection score: ${avgScore}, Total iterations: ${totalIterations}`)
+    // If NO chunks were successfully humanized, throw so caller can use Claude fallback
+    if (successfulChunks === 0 && chunks.length > 0) {
+      const errorMsg = lastError?.message || 'All chunks failed'
+      console.error(`[StealthGPT] ALL ${chunks.length} chunks failed - throwing to trigger fallback. Last error: ${errorMsg}`)
+      throw new Error(`StealthGPT humanization failed for all ${chunks.length} chunks: ${errorMsg}`)
+    }
+
+    const avgScore = chunks.length > 0 ? Math.round(totalDetectionScore / successfulChunks) : 0
+    console.log(`[StealthGPT] Complete! ${successfulChunks}/${chunks.length} chunks humanized. Avg detection score: ${avgScore}, Total iterations: ${totalIterations}`)
 
     return humanizedChunks.join('\n\n')
   }
