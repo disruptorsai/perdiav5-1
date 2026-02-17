@@ -45,6 +45,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import GetEducatedPreview from '@/components/article/GetEducatedPreview'
+import QualityChecklist from '@/components/article/QualityChecklist'
 import { RevisionProgressAnimation } from '@/components/article'
 
 // Comment categories - must match DB CHECK constraint: accuracy, clarity, tone, seo, structure, style, other
@@ -736,8 +737,14 @@ export default function ArticleReview() {
             </Card>
           </div>
 
-          {/* Comments Sidebar */}
+          {/* Quality & Comments Sidebar */}
           <div className="space-y-4">
+            {/* Quality Checklist */}
+            <QualityChecklist
+              article={article}
+              content={article?.content}
+            />
+
             <Card className="border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
