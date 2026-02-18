@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, formatDistanceToNow, isPast, differenceInDays, differenceInHours } from 'date-fns'
 import { motion } from 'framer-motion'
@@ -197,6 +197,7 @@ export default function ReviewQueue() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const navigate = useNavigate()
   const [selectedStatus, setSelectedStatus] = useState('qa_review')
   const [searchQuery, setSearchQuery] = useState('')
   const [deleteModalArticle, setDeleteModalArticle] = useState(null)
@@ -719,12 +720,10 @@ export default function ReviewQueue() {
                             </Button>
                           )}
 
-                          <Link to={`/editor/${article.id}`}>
-                            <Button variant="ghost" className="gap-2 w-full">
-                              <FileText className="w-4 h-4" />
-                              Edit
-                            </Button>
-                          </Link>
+                          <Button variant="ghost" className="gap-2 w-full" onClick={() => navigate(`/editor/${article.id}`)}>
+                            <FileText className="w-4 h-4" />
+                            Edit
+                          </Button>
 
                           <Button
                             variant="ghost"
