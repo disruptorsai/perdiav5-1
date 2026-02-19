@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../services/supabaseClient'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useArticle, useUpdateArticle, useUpdateArticleStatus } from '../hooks/useArticles'
 // import { useArticleEditing } from '../hooks/useArticleLock' // TEMPORARILY DISABLED
@@ -247,6 +248,29 @@ function ArticleEditorContent() {
 
   // Calculate word count using TipTap helper
   const wordCount = useMemo(() => getWordCount(content), [content])
+
+  // Auto-sync quality score to DB when it changes (keeps Review Queue in sync with editor)
+  const lastSyncedScoreRef = useRef(null)
+  useEffect(() => {
+    if (!articleId || !qualityData?.score || qualityData.score === lastSyncedScoreRef.current) return
+    // Only sync if the score differs from what's stored
+    if (article?.quality_score === qualityData.score) {
+      lastSyncedScoreRef.current = qualityData.score
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        await supabase
+          .from('articles')
+          .update({ quality_score: qualityData.score, quality_issues: qualityData.issues || [] })
+          .eq('id', articleId)
+        lastSyncedScoreRef.current = qualityData.score
+      } catch (e) {
+        console.warn('Auto-sync quality score failed:', e)
+      }
+    }, 2000) // Debounce 2s to avoid excessive writes
+    return () => clearTimeout(timer)
+  }, [articleId, qualityData?.score, article?.quality_score])
 
   // Save handler
   const handleSave = async () => {
