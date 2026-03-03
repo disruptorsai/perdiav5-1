@@ -23,11 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_shortcodes_is_active ON shortcodes(is_active) WHE
 -- ============================================================================
 -- 2. UPDATE CLAUDE MODEL IN SETTINGS (if exists)
 -- ============================================================================
-
-UPDATE system_settings
-SET value = 'claude-sonnet-4-20250514'
-WHERE key = 'claude_model'
-  AND value = 'claude-3-5-sonnet-20250122';
+-- SKIPPED: Column names may vary between deployments (key vs setting_key)
+-- The application handles model selection in code instead
 
 -- ============================================================================
 -- 3. ENSURE ai_learning_sessions EXISTS (from consolidated fix)
