@@ -260,7 +260,10 @@ function MainLayout() {
       <div className="pl-64">
         <SystemStatusBanner />
         <main className="min-h-screen">
-          <Outlet />
+          {/* Key on top-level route segment forces remount when switching pages
+              (editor→dashboard) but NOT when changing params within the same page
+              (editor/1→editor/2). This fixes the "stuck on editor" navigation bug. */}
+          <Outlet key={location.pathname.split('/')[1] || 'index'} />
         </main>
       </div>
 
