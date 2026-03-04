@@ -242,7 +242,9 @@ What to do: ${comment.feedback || comment.comment}
 THIS IS ATTEMPT ${attempt}. Previous attempts failed to make this change. Please:
 1. Make ONLY this one specific change
 2. Keep everything else exactly the same
-3. Output the complete HTML content
+3. NEVER remove existing <a href="..."> links - keep ALL existing links intact
+4. If the change asks to ADD a hyperlink/link, wrap text in <a href="URL">text</a> using the exact URL from the feedback
+5. Output the complete HTML content
 
 CURRENT HTML CONTENT:
 ${content}
@@ -306,11 +308,17 @@ ${feedbackItems.join('\n\n')}
 CRITICAL RULES:
 1. Output ONLY valid HTML - no markdown, no code blocks
 2. Preserve ALL existing HTML structure (<h2>, <h3>, <p>, <ul>, <a>, etc.)
-3. Preserve ALL links with their href attributes
+3. Preserve ALL links with their href attributes - NEVER remove an existing <a> tag unless explicitly asked
 4. Preserve ALL shortcodes: [su_ge-picks], [su_ge-cta], etc.
 5. Make EACH requested change - do not skip any
+6. If editing text near or inside an existing link, KEEP the <a> tag and href intact
 
-LINKING RULES (if adding links):
+LINK HANDLING:
+- NEVER remove existing links. If you modify text around a link, the <a href="..."> tag MUST remain.
+- If feedback asks to ADD a hyperlink/link/URL: wrap the relevant text in <a href="URL">text</a> using the EXACT URL from the feedback
+- Example: feedback says "add link to https://www.geteducated.com/rankings/page" → change relevant text to <a href="https://www.geteducated.com/rankings/page">text</a>
+
+LINKING RULES (if adding NEW links):
 - NEVER use .edu links
 - NEVER use competitor sites (bestcolleges.com, usnews.com, onlineu.com)
 - Use GetEducated pages: geteducated.com/online-schools/, geteducated.com/online-degrees/

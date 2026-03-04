@@ -374,6 +374,18 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
    - Rewrite sentences that weren't mentioned in feedback
    - Add new sections unless specifically requested
 
+5. **LINK PRESERVATION (CRITICAL)**:
+   - You MUST keep ALL existing <a href="...">...</a> links exactly as they are
+   - If you modify text near or inside a link, keep the <a> tag and its href attribute intact
+   - Removing an existing link is NEVER acceptable unless the feedback explicitly asks to remove it
+   - Count links before and after your edit - the count must stay the same or increase
+
+6. **ADDING LINKS**: If feedback requests adding a hyperlink, link, or URL:
+   - Wrap the relevant text in an <a href="URL">text</a> tag
+   - Use the EXACT URL provided in the feedback
+   - Example: If feedback says "add link to https://example.com/page", change the relevant text to <a href="https://example.com/page">relevant text</a>
+   - If the feedback mentions a "ranking report" link, use the exact GetEducated URL provided
+
 === CURRENT HTML CONTENT (${originalWordCount} words) ===
 
 ${content}
