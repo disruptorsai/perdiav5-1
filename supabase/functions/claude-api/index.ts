@@ -250,7 +250,10 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
           throw new Error('Missing required parameters: content and feedbackItems (array)')
         }
 
-        console.log('Revising content with feedback...')
+        console.log('Revising content with feedback (with guardrails)...')
+
+        const currentYear = new Date().getFullYear()
+        const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
         const feedbackText = feedbackItems.map((item: any, index: number) => {
           return `${index + 1}. [${item.category.toUpperCase()}] ${item.severity}: "${item.selected_text}"
@@ -295,12 +298,56 @@ OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
         const prompt = `You are a content editor revising this article based on editorial feedback.
 
-CURRENT CONTENT:
+=== CRITICAL GUARDRAILS - MUST FOLLOW ===
+
+1. FACTUAL ACCURACY:
+   - NEVER invent tuition costs, school rankings, or program details
+   - If cost data is provided below, use ONLY those exact numbers
+   - If NO cost data is provided, use qualitative language ("affordable", "competitive") instead of specific numbers
+   - If you cannot find verified data for a claim, rewrite to avoid the claim
+
+2. INTERNAL LINKS:
+   - ONLY use URLs from the "APPROVED INTERNAL LINKS" section below
+   - If no approved links are provided, do NOT add new internal links
+   - NEVER invent GetEducated URLs - they will 404
+
+3. EXTERNAL LINKS - STRICT WHITELIST:
+   - ONLY link to these exact domains: bls.gov, ed.gov, nces.ed.gov, studentaid.gov, fafsa.gov, collegescorecard.ed.gov
+   - Also allowed: chea.org, aacsb.edu, abet.org, cacrep.org, ccne-accreditation.org, cswe.org
+   - Also allowed: collegeboard.org, acenet.edu, aacn.nche.edu, naspa.org, apa.org, nasw.org, nursingworld.org
+   - NEVER link to: .edu school sites, Wikipedia, news sites, foundations, associations not listed above
+   - NEVER link to: onlineu.com, usnews.com, bestcolleges.com, niche.com, or any competitor
+   - If you're unsure if a link is allowed, DO NOT include it - the text will suffice without a link
+
+4. DATES:
+   - Today's date is ${currentDate}
+   - The current year is ${currentYear}
+   - ALWAYS use ${currentYear} for "current year" references
+
+=== END GUARDRAILS ===
+${costDataSection}${internalLinksSection}
+CURRENT HTML CONTENT:
 ${content}
 
-EDITORIAL FEEDBACK:
+EDITORIAL FEEDBACK TO ADDRESS:
 ${feedbackText}
 ${linkingRules}${internalLinkContext}
+=== CRITICAL HTML FORMATTING RULES ===
+
+Your output MUST be properly formatted HTML with:
+1. <h2> tags for major section headings
+2. <h3> tags for subsections
+3. <p> tags wrapping EVERY paragraph of text
+4. <ul> and <li> tags for bulleted lists
+5. <ol> and <li> tags for numbered lists
+6. <strong> or <b> tags for bold text
+7. <em> or <i> tags for italic text
+8. <a href="..."> tags for any links
+
+NEVER output plain text without HTML tags. Every paragraph MUST be wrapped in <p> tags.
+
+=== END HTML FORMATTING RULES ===
+
 === CRITICAL HTML FORMATTING RULES ===
 
 Your output MUST be properly formatted HTML with:

@@ -141,9 +141,52 @@ function ArticleEditorContent() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   const [thumbsFeedbackComment, setThumbsFeedbackComment] = useState('')
 
-  // Update local state when article loads
+  // UI state
+  const [saving, setSaving] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
+  const [sidebarTab, setSidebarTab] = useState('quality')
+  const [showPreview, setShowPreview] = useState(false)
+  const [commentMode, setCommentMode] = useState(false) // Comment mode for text selection feedback
+  const [qualityData, setQualityData] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const [isHumanizing, setIsHumanizing] = useState(false)
+  const [isRevising, setIsRevising] = useState(false)
+  const [feedbackComment, setFeedbackComment] = useState('')
+  const [feedbackComments, setFeedbackComments] = useState([]) // Array of comments for AI revision
+
+  // Compliance update state (per Dec 22, 2025 meeting - "Update" button)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState(null)
+  
+  // FIX: Preview mode reverting - Lift pendingRevision to parent
+  // This ensures revised content persists when switching between modes
+  const [pendingRevision, setPendingRevision] = useState(null)
+
+  // B-06: Track unsaved changes for navigation warning
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const initialContentRef = useRef(null)
+  const initialTitleRef = useRef(null)
+
+  // B-08: Additional AI revision tools state
+  const [showRegenerateSectionDialog, setShowRegenerateSectionDialog] = useState(false)
+  const [selectedSectionToRegenerate, setSelectedSectionToRegenerate] = useState('')
+  const [regenerateInstructions, setRegenerateInstructions] = useState('')
+  const [isRegeneratingSection, setIsRegeneratingSection] = useState(false)
+  const [requestChangesText, setRequestChangesText] = useState('')
+  const [isRequestingChanges, setIsRequestingChanges] = useState(false)
+
+  // Thumbs up/down feedback state (per Dec 22, 2025 meeting)
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
+  const [thumbsFeedbackComment, setThumbsFeedbackComment] = useState('')
+
+  // B-07 FIX: Track if we've loaded initial data to prevent refetch from wiping user changes
+  const hasLoadedInitialDataRef = useRef(false)
+
+  // Update local state when article loads - ONLY on initial load
+  // B-07: After initial load, don't overwrite user's local changes from refetch
   useEffect(() => {
-    if (article) {
+    if (article && !hasLoadedInitialDataRef.current) {
       setTitle(article.title || '')
       setContent(article.content || '')
       setMetaDescription(article.meta_description || '')

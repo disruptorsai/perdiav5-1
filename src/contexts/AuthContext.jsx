@@ -1,7 +1,21 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, getCurrentUser } from '../services/supabaseClient'
+import { createContext, useContext } from 'react'
 
 const AuthContext = createContext({})
+
+// Anonymous user ID for development (consistent across sessions)
+const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000'
+
+// Mock user for development without authentication
+const MOCK_USER = {
+  id: ANONYMOUS_USER_ID,
+  email: 'dev@perdia.local',
+  user_metadata: {
+    name: 'Developer',
+  },
+  app_metadata: {},
+  aud: 'authenticated',
+  role: 'authenticated',
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -12,36 +26,7 @@ export const useAuth = () => {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Check active session
-    getCurrentUser()
-      .then((user) => {
-        setUser(user)
-      })
-      .catch((error) => {
-        console.error('Error getting user:', error)
-        setUser(null)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-        setLoading(false)
-      }
-    )
-
-    return () => {
-      subscription?.unsubscribe()
-    }
-  }, [])
-
+  // Always provide mock user - no authentication required
   const value = {
     user,
     loading,

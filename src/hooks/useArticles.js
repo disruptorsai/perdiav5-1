@@ -62,6 +62,7 @@ export function useArticle(articleId) {
 
 /**
  * Create a new article
+ * Note: In development mode (no auth), user_id is omitted to avoid foreign key errors
  */
 export function useCreateArticle() {
   const { user } = useAuth()
@@ -69,12 +70,18 @@ export function useCreateArticle() {
 
   return useMutation({
     mutationFn: async (articleData) => {
+      // Check if we're using the mock/anonymous user (no real auth)
+      const isAnonymousUser = user?.id === '00000000-0000-0000-0000-000000000000'
+
+      const insertData = {
+        ...articleData,
+        // Only include user_id if it's a real authenticated user
+        ...(isAnonymousUser ? {} : { user_id: user.id }),
+      }
+
       const { data, error } = await supabase
         .from('articles')
-        .insert({
-          ...articleData,
-          user_id: user.id,
-        })
+        .insert(insertData)
         .select()
         .single()
 

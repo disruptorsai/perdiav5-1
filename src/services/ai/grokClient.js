@@ -89,13 +89,76 @@ class GrokClient {
   }
 
   /**
-   * Make a request to the Grok API
+   * Call the grok-api Edge Function for server-side Grok access
+   */
+  async edgeFunctionRequest(action, payload) {
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/grok-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.supabaseAnonKey}`,
+        'apikey': this.supabaseAnonKey,
+      },
+      body: JSON.stringify({ action, payload }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Edge Function error (${response.status}): ${errorText}`)
+    }
+
+    const result = await response.json()
+    if (!result.success) {
+      throw new Error(result.error || 'Edge Function returned an error')
+    }
+
+    return result.data
+  }
+
+  /**
+   * Strip markdown code blocks from response
+   * Handles ```json ... ``` and ``` ... ``` wrappers
+   */
+  stripMarkdownCodeBlocks(text) {
+    if (!text) return text
+
+    // Remove ```json or ```JSON or just ``` at the start
+    let cleaned = text.trim()
+
+    // Match opening code fence with optional language specifier
+    const openFenceMatch = cleaned.match(/^```(?:json|JSON)?\s*\n?/)
+    if (openFenceMatch) {
+      cleaned = cleaned.slice(openFenceMatch[0].length)
+    }
+
+    // Match closing code fence
+    const closeFenceMatch = cleaned.match(/\n?```\s*$/)
+    if (closeFenceMatch) {
+      cleaned = cleaned.slice(0, -closeFenceMatch[0].length)
+    }
+
+    return cleaned.trim()
+  }
+
+  /**
+   * Safely parse JSON from AI response, handling markdown wrappers
+   */
+  parseJsonResponse(response) {
+    const cleaned = this.stripMarkdownCodeBlocks(response)
+    return JSON.parse(cleaned)
+  }
+
+  /**
+   * Make a request to the Grok API (via OpenRouter or direct)
    */
   async request(messages, options = {}) {
-    // Check if API key is set
-    if (!this.apiKey || this.apiKey === 'undefined') {
-      console.warn('⚠️ Grok API key not set. Using mock data for testing.')
-      return this.getMockResponse(messages)
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generate', {
+        prompt: messages.find(m => m.role === 'user')?.content || '',
+        temperature: options.temperature || 0.8,
+        max_tokens: options.max_tokens || this.defaultMaxTokens,
+      })
     }
 
     const {
@@ -103,26 +166,31 @@ class GrokClient {
       max_tokens = this.defaultMaxTokens, // Use class default (8000) instead of 4000
     } = options
 
-    // Try multiple model names if the primary fails
-    const modelVariants = [
-      this.model,           // grok-2-latest
-      'grok-2',             // Alternative name
-      'grok-beta',          // Legacy name
-      'grok-2-1212',        // Versioned name
-    ]
+    // Build headers - add OpenRouter-specific headers if using OpenRouter
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+    }
+
+    if (this.useOpenRouter) {
+      headers['HTTP-Referer'] = 'https://perdiav5.netlify.app'
+      headers['X-Title'] = 'Perdia v5 Content Engine'
+    }
+
+    // Model variants to try (updated for current OpenRouter availability)
+    const modelVariants = this.useOpenRouter
+      ? ['x-ai/grok-3', 'x-ai/grok-3-mini', 'x-ai/grok-4', 'x-ai/grok-4-fast']  // OpenRouter model names
+      : [this.model, 'grok-3', 'grok-3-mini', 'grok-2']  // Direct xAI model names
 
     let lastError = null
 
     for (const modelName of modelVariants) {
       try {
-        console.log(`Trying Grok model: ${modelName}`)
+        console.log(`Trying Grok model${this.useOpenRouter ? ' via OpenRouter' : ''}: ${modelName}`)
 
         const response = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
+          headers,
           body: JSON.stringify({
             model: modelName,
             messages,
@@ -135,7 +203,6 @@ class GrokClient {
         if (response.ok) {
           const data = await response.json()
           console.log(`✓ Successfully used model: ${modelName}`)
-          // Update the model name for future requests
           this.model = modelName
           return data.choices[0].message.content
         }
@@ -155,12 +222,10 @@ class GrokClient {
           throw new Error(`Grok API error (${response.status}): ${errorMessage}`)
         }
 
-        // Store 404 error but continue trying other models
         lastError = new Error(`Model '${modelName}' not found (404)`)
         console.warn(`Model ${modelName} returned 404, trying next variant...`)
 
       } catch (error) {
-        // If it's not a 404, stop trying and throw
         if (!error.message.includes('404')) {
           throw error
         }
@@ -168,9 +233,7 @@ class GrokClient {
       }
     }
 
-    // If we get here, all models failed
     console.error('All Grok model variants failed:', modelVariants)
-    console.error('Please check https://docs.x.ai/api for the current model name')
     throw lastError || new Error('Failed to connect to Grok API with any known model name')
   }
 
@@ -518,6 +581,11 @@ Generate the article now:`
    * Generate content ideas from seed topics
    */
   async generateIdeas(seedTopics, count = 10) {
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateIdeas', { seedTopics, count })
+    }
+
     const prompt = `Generate ${count} unique, specific content ideas for articles about: ${seedTopics.join(', ')}
 
 REQUIREMENTS:
@@ -681,6 +749,11 @@ Return ONLY the JSON array, no other text.`
    * Generate SEO metadata for an article
    */
   async generateMetadata(articleContent, focusKeyword) {
+    // Route through Edge Function when no client-side API key
+    if (this.useEdgeFunction) {
+      return this.edgeFunctionRequest('generateMetadata', { articleContent, focusKeyword })
+    }
+
     const prompt = `Given this article content and focus keyword, generate optimized SEO metadata.
 
 FOCUS KEYWORD: ${focusKeyword}

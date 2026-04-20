@@ -978,7 +978,15 @@ class GenerationService {
       }
     }).join('\n')
 
+    const currentYear = new Date().getFullYear()
+
     const prompt = `You are reviewing an article and need to fix the following quality issues:
+
+IMPORTANT DATE CONTEXT:
+- Today's date is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+- The current year is ${currentYear}
+- When referencing years or dates, use ${currentYear} as the current year
+- NEVER use outdated years when referring to "this year" or "current"
 
 QUALITY ISSUES TO FIX:
 ${issueDescriptions}
@@ -1725,6 +1733,7 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
 
   /**
    * Save generated article to database
+   * ENHANCED: Now strips unapproved links before saving (Feb 2026)
    */
   async saveArticle(articleData, ideaId, userId) {
     try {
@@ -1735,10 +1744,7 @@ OUTPUT ONLY THE UPDATED HTML CONTENT with links added.`
 
       const { data, error } = await supabase
         .from('articles')
-        .insert({
-          ...articleData,
-          user_id: userId,
-        })
+        .insert(insertData)
         .select()
         .single()
 

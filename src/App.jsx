@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { GenerationProgressProvider } from './contexts/GenerationProgressContext'
@@ -8,7 +8,6 @@ import FloatingProgressWindow from './components/ui/FloatingProgressWindow'
 import { queryClient } from './lib/queryClient'
 
 // Pages
-import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ArticleEditor from './pages/ArticleEditor'
 import ContentIdeas from './pages/ContentIdeas'
@@ -33,8 +32,13 @@ import DevFeedbackQueue from './pages/DevFeedbackQueue'
 // Layout
 import MainLayout from './components/layout/MainLayout'
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
+// Wrapper component to force Dashboard remount on navigation
+// Fixes B-05: Dashboard navigation bug where clicking Dashboard link doesn't navigate properly
+function DashboardWithKey() {
+  const location = useLocation()
+  // Use location.key to force remount when navigating to the Dashboard
+  return <Dashboard key={location.key} />
+}
 
   if (loading) {
     return (

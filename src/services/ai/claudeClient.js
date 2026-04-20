@@ -1,9 +1,7 @@
 /**
  * Claude AI Client for Content Humanization
- * Uses Anthropic's Claude API for making content undetectable and auto-fixing quality issues
+ * Uses OpenRouter or Anthropic's Claude API for making content undetectable and auto-fixing quality issues
  */
-
-import Anthropic from '@anthropic-ai/sdk'
 
 class ClaudeClient {
   constructor(apiKey) {
@@ -31,18 +29,81 @@ class ClaudeClient {
     } = options
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens,
-        temperature,
-        messages,
-      })
-
-      return response.content[0].text
+      const response = await this.makeRequest(messages, { temperature, max_tokens })
+      return response
 
     } catch (error) {
       console.error('Claude chat error:', error)
       throw error
+    }
+  }
+
+  /**
+   * Make a request to Claude API (via OpenRouter or direct)
+   */
+  async makeRequest(messages, options = {}) {
+    const { temperature = 0.7, max_tokens = 4000 } = options
+
+    // Build headers
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+    }
+
+    if (this.useOpenRouter) {
+      headers['HTTP-Referer'] = 'https://perdiav5.netlify.app'
+      headers['X-Title'] = 'Perdia v5 Content Engine'
+    } else {
+      // Direct Anthropic API requires different headers
+      headers['x-api-key'] = this.apiKey
+      headers['anthropic-version'] = '2023-06-01'
+      delete headers['Authorization']
+    }
+
+    const endpoint = this.useOpenRouter
+      ? `${this.baseUrl}/chat/completions`
+      : `${this.baseUrl}/messages`
+
+    // OpenRouter uses OpenAI-style format, Anthropic uses its own format
+    const body = this.useOpenRouter
+      ? {
+          model: this.model,
+          messages,
+          temperature,
+          max_tokens,
+        }
+      : {
+          model: this.model,
+          max_tokens,
+          temperature,
+          messages,
+        }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorMessage = 'Unknown error'
+      try {
+        const error = JSON.parse(errorText)
+        errorMessage = error.error?.message || error.message || errorText
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status}`
+      }
+      throw new Error(`Claude API error (${response.status}): ${errorMessage}`)
+    }
+
+    const data = await response.json()
+
+    // OpenRouter returns OpenAI-style response, Anthropic returns its own format
+    if (this.useOpenRouter) {
+      return data.choices[0].message.content
+    } else {
+      return data.content[0].text
     }
   }
 
@@ -99,19 +160,17 @@ class ClaudeClient {
     const prompt = this.buildHumanizationPrompt(content, contributorProfile, targetPerplexity, targetBurstiness)
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4500,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.9,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 4500,
       })
 
-      return response.content[0].text
+      return response
 
     } catch (error) {
       console.error('Claude humanization error:', error)
@@ -323,19 +382,17 @@ INSTRUCTIONS:
 OUTPUT ONLY THE CORRECTED HTML CONTENT. DO NOT include explanations or notes.`
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4500,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.7,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 4500,
       })
 
-      return response.content[0].text
+      return response
 
     } catch (error) {
       console.error('Claude auto-fix error:', error)
@@ -487,19 +544,17 @@ FORMAT AS JSON:
 Generate the patterns now:`
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 2000,
+      const response = await this.makeRequest([
+        {
+          role: 'user',
+          content: prompt
+        }
+      ], {
         temperature: 0.6,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        max_tokens: 2000,
       })
 
-      const parsed = JSON.parse(response.content[0].text)
+      const parsed = JSON.parse(response)
       return parsed.patterns
 
     } catch (error) {
